@@ -44,7 +44,8 @@ class SimTop extends Module {
   val memdelay = Module(new AXI4Delayer(0))
   val mmio = Module(new SimMMIO)
 
-  soc.io.frontend <> mmio.io.dma
+//  soc.io.frontend <> mmio.io.dma
+  mmio.io.dma <> DontCare
 
   memdelay.io.in <> soc.io.mem
   mem.io.in <> memdelay.io.out

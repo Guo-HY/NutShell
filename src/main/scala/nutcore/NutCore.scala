@@ -92,7 +92,7 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     val imem = new SimpleBusC
     val dmem = new SimpleBusC
     val mmio = new SimpleBusUC
-    val frontend = Flipped(new SimpleBusUC())
+//    val frontend = Flipped(new SimpleBusUC())
   }
   val io = IO(new NutCoreIO)
 
@@ -137,7 +137,7 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
     // Make DMA access through L1 DCache to keep coherence
     val expender = Module(new SimpleBusUCExpender(userBits = DCacheUserBundleWidth, userVal = 0.U))
-    expender.io.in <> io.frontend
+    expender.io.in <> DontCare // io.frontend
     dmemXbar.io.in(0) <> expender.io.out
 
     io.mmio <> mmioXbar.io.out
@@ -164,7 +164,7 @@ class NutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     backend.io.flush := frontend.io.flushVec(3,2)
 
     // Make DMA access through L1 DCache to keep coherence
-    dmemXbar.io.in(3) <> io.frontend
+    dmemXbar.io.in(3) <> DontCare // io.frontend
 
     io.mmio <> mmioXbar.io.out
   }

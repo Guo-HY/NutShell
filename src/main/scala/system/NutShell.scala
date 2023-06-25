@@ -45,7 +45,7 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   val io = IO(new Bundle{
     val mem = new AXI4
     val mmio = (if (p.FPGAPlatform) { new AXI4 } else { new SimpleBusUC })
-    val frontend = Flipped(new AXI4)
+//    val frontend = Flipped(new AXI4)
     val meip = Input(UInt(Settings.getInt("NrExtIntr").W))
     val ila = if (p.FPGAPlatform && EnableILA) Some(Output(new ILABundle)) else None
   })
@@ -58,9 +58,9 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   xbar.io.in(0) <> nutcore.io.imem.mem // cohMg.io.out.mem
   xbar.io.in(1) <> nutcore.io.dmem.mem
 
-  val axi2sb = Module(new AXI42SimpleBusConverter())
-  axi2sb.io.in <> io.frontend
-  nutcore.io.frontend <> axi2sb.io.out
+//  val axi2sb = Module(new AXI42SimpleBusConverter())
+//  axi2sb.io.in <> io.frontend
+//  nutcore.io.frontend <> axi2sb.io.out
 
   val memport = xbar.io.out.toMemPort()
   memport.resp.bits.data := DontCare
