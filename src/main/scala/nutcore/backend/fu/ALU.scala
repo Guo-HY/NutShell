@@ -183,15 +183,36 @@ class ALU(hasBru : Boolean = false) extends AbstractALU {
 }
 
 object La32rALUOpType {
-  def addw = 1.U
-  def subw = 2.U
-  def addiw = 3.U
+  def addw    = "b0000001".U
+  def subw    = "b0000010".U
+  def addiw   = "b0000011".U
+
+  // control flow instruction
+  // func(4) is always 1
+  // branch (conditional jump) func(3) is always 0
+  def beq   = "b0010000".U
+  def bne   = "b0010001".U
+  def blt   = "b0010010".U
+  def bge   = "b0010011".U
+  def bltu  = "b0010100".U
+  def bgeu  = "b0010101".U
+
+  def b     = "b0011000".U
+  def jirl  = "b0011010".U
+  def call  = "b0011011".U // call is bl
+  def ret   = "b0011100".U // jirl & rd=0 & rj=1 & offs16=0
+
+
+  def isBru(func: UInt) = func(4)
+  def isBranch(func: UInt) = !func(3) // branch === conditional cfi
+  def isJump(func: UInt) = func(3) // jump === unconditional cfi
 }
 
 class La32rALU(hasBru : Boolean = false) extends AbstractALU {
 
   val rj = src1
   val rk = src2
+  val branchRd = src2
   val imm = io.offset
 
   val signExtI12 = SignExt(imm(11, 0), XLEN)
@@ -199,20 +220,63 @@ class La32rALU(hasBru : Boolean = false) extends AbstractALU {
   val isAdderSub = func =/= La32rALUOpType.addiw && func =/= La32rALUOpType.addw
   val adderRes = (rj +& (rk ^ Fill(XLEN, isAdderSub))) + isAdderSub
 
-  val res = LookupTreeDefault(func, adderRes, List(
+  val aluRes = LookupTreeDefault(func, adderRes, List(
     La32rALUOpType.addw   -> adderRes,
     La32rALUOpType.subw   -> adderRes,
     La32rALUOpType.addiw  -> (rj + signExtI12),
   ))
 
-  io.out.bits := res
+  val branchTakenTable = List(
+    La32rALUOpType.beq -> (rj === branchRd),
+    La32rALUOpType.bne -> (rj =/= branchRd),
+    La32rALUOpType.blt -> (rj.asSInt() < branchRd.asSInt()),
+    La32rALUOpType.bge -> (rj.asSInt() >= branchRd.asSInt()),
+    La32rALUOpType.bltu -> (rj < branchRd),
+    La32rALUOpType.bgeu -> (rj >= branchRd)
+  )
 
-  io.redirect := DontCare
+  val isBru = La32rALUOpType.isBru(func)
+  val isBranch = La32rALUOpType.isBranch(func)
+  val branchTaken = LookupTree(func, branchTakenTable)
+  val branchTakenTarget = io.cfIn.pc + SignExt(Cat(imm(15, 0), 0.U(2.W)), XLEN)
+  val directJumpTarget = io.cfIn.pc + SignExt(Cat(imm(25, 0), 0.U(2.W)), XLEN) // B and BL use this
+  val indirectJumpTarget = rj + SignExt(Cat(imm(15, 0), 0.U(2.W)), XLEN) // JIRL use this
+  val taken = (isBranch && branchTaken) | La32rALUOpType.isJump(func)
+  val takenTarget = Mux(isBranch, branchTakenTarget,
+    Mux(func === La32rALUOpType.call || func === La32rALUOpType.b, directJumpTarget, indirectJumpTarget))
+  val predictWrong = (io.cfIn.brIdx(0) ^ taken) | (taken && io.cfIn.pnpc =/= takenTarget) // direction fail or target fail
+
+  io.redirect.valid := predictWrong
+  io.redirect.target := Mux(taken, takenTarget, io.cfIn.pc + 4.U)
+  val redirectRtype = if (EnableOutOfOrderExec) 1.U else 0.U // TODO : what is this
+  io.redirect.rtype := redirectRtype
+
+  io.out.bits := Mux(isBru, io.cfIn.pc + 4.U,aluRes)
 
   io.in.ready := io.out.ready
   io.out.valid := valid
 
+  val bruFuncTobtbTypeTable = List(
+    La32rALUOpType.jirl -> BTBtype.I,
+    La32rALUOpType.b -> BTBtype.J,
+    La32rALUOpType.call -> BTBtype.J,
+    La32rALUOpType.beq -> BTBtype.B,
+    La32rALUOpType.bne -> BTBtype.B,
+    La32rALUOpType.blt -> BTBtype.B,
+    La32rALUOpType.bge -> BTBtype.B,
+    La32rALUOpType.bltu -> BTBtype.B,
+    La32rALUOpType.bgeu -> BTBtype.B
+  )
+
   val bpuUpdateReq = WireInit(0.U.asTypeOf(new BPUUpdateReq))
+  bpuUpdateReq.valid := valid && isBru
+  bpuUpdateReq.pc := io.cfIn.pc
+  bpuUpdateReq.isMissPredict := predictWrong
+  bpuUpdateReq.actualTarget := io.redirect.target
+  bpuUpdateReq.actualTaken := taken
+  bpuUpdateReq.fuOpType := func
+  bpuUpdateReq.btbType := LookupTree(func, bruFuncTobtbTypeTable)
+  bpuUpdateReq.isRVC := false.B
 
   if (hasBru) {
     BoringUtils.addSource(RegNext(bpuUpdateReq), "bpuUpdateReq")

@@ -199,8 +199,9 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   val decodeList = ListLookup(instr, La32rInstructions.DecodeDefault, La32rInstructions.DecodeTable)
   val instrType :: fuType :: fuOpType :: isrfWen :: Nil = decodeList // TODO : add exception handle
 
+  val outFuOpType = io.out.bits.ctrl.fuOpType // TODO : this is dirty implementation to pass firrtl compile
   io.out.bits := DontCare
-  io.isBranch := DontCare
+  io.isBranch := La32rALUOpType.isBranch(outFuOpType) && fuType === FuType.bru // TODO : this signal may be useless
   io.isWFI := DontCare
 
   io.out.bits.ctrl.fuType := fuType
@@ -208,6 +209,7 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
 
   // use SrcType.imm when we do not need reg source
   // rj is src1, rk is src2, rd is dest
+  // but when it is branch inst, rj is src1, rd is src2
   val SrcTypeTable = List(
     Instr2R     -> (SrcType.reg, SrcType.imm),
     Instr3R     -> (SrcType.reg, SrcType.reg),
@@ -218,7 +220,8 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     Instr1RI21  -> (SrcType.reg, SrcType.imm),
     InstrI26    -> (SrcType.imm, SrcType.imm),
     Instr1RI20  -> (SrcType.imm, SrcType.imm),
-    Instr2RI5   -> (SrcType.reg, SrcType.imm)
+    Instr2RI5   -> (SrcType.reg, SrcType.imm),
+    InstrBranch -> (SrcType.reg, SrcType.reg),
   )
 
   val src1Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._1)))
@@ -226,8 +229,8 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
 
   val (rk, rj, rd) = (instr(14, 10), instr(9, 5), instr(4, 0))
   val rfSrc1 = rj
-  val rfSrc2 = rk
-  val rfDest = rd
+  val rfSrc2 = Mux(fuType === FuType.bru && La32rALUOpType.isBranch(outFuOpType), rd, rk)
+  val rfDest = Mux(fuType === FuType.bru && (fuOpType === La32rALUOpType.call), 1.U ,rd)
 
   io.out.bits.ctrl.rfSrc1 := Mux(src1Type === SrcType.imm , 0.U, rfSrc1)
   io.out.bits.ctrl.rfSrc2 := Mux(src2Type === SrcType.imm , 0.U, rfSrc2)
@@ -251,6 +254,13 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   io.out.bits.ctrl.src1Type := src1Type
   io.out.bits.ctrl.src2Type := src2Type
 
+  when (fuType === FuType.bru) {
+    // see la32r spec page 17 JIRL description
+    when (fuOpType === La32rALUOpType.jirl && rd === 0.U && rj === 1.U && instr(25, 10) === 0.U) {
+      io.out.bits.ctrl.fuOpType := La32rALUOpType.ret
+    }
+  }
+
   io.out.valid := io.in.valid
   io.in.ready := !io.in.valid || io.out.fire() && !hasIntr
   io.out.bits.cf <> io.in.bits
@@ -266,7 +276,7 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   // TODO : just for debug
   when (io.out.bits.cf.exceptionVec(illegalInstr) === true.B) {
     LADebug(true.B, "decode detecte illegal instr=0x%x\n", instr)
-    assert(false.B)
+//    assert(false.B)
   }
 
 

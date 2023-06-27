@@ -46,6 +46,7 @@ trait HasLa32rInstrType {
   def InstrI26    = "b1000".U
   def Instr1RI20  = "b1001".U
   def Instr2RI5   = "b1010".U
+  def InstrBranch = "b1011".U
   def InstrN      = "b1111".U // the instruction is not a legal instr
 }
 
@@ -106,5 +107,5 @@ object CInstructions extends HasInstrType with HasNutCoreParameter{
 object La32rInstructions extends HasLa32rInstrType with HasNutCoreParameter {
   def NOP = "b0 0 0 0 0 0 1 1 0 1_000000000000_00000_00000".U // andi r0, r0, 0
   val DecodeDefault = List(InstrN, FuType.csr, CSROpType.jmp, false.B) // TODO : update this
-  def DecodeTable = LA32R_ALUInstr.table
+  def DecodeTable = LA32R_ALUInstr.table ++ LA32R_BRUInstr.table
 }
