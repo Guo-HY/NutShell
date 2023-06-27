@@ -19,9 +19,9 @@ package device
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
-
 import nutcore.HasNutCoreParameter
 import bus.axi4._
+import top.Settings
 import utils._
 
 class RAMHelper(memByte: Int) extends BlackBox with HasNutCoreParameter {
@@ -42,7 +42,9 @@ class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int,
 
   val offsetBits = log2Up(memByte)
   val offsetMask = (1 << offsetBits) - 1
-  def index(addr: UInt) = (addr & offsetMask.U) >> log2Ceil(DataBytes)
+//  def index(addr: UInt) = (addr & offsetMask.U) >> log2Ceil(DataBytes)
+  // NOTE : be careful that we use addr - resetvector to access memory, so other section should always after text section
+  def index(addr: UInt) = (addr - Settings.getLong("ResetVector").U) >> log2Ceil(DataBytes)
   def inRange(idx: UInt) = idx < (memByte / 8).U
 
   val wIdx = index(waddr) + writeBeatCnt
@@ -57,7 +59,7 @@ class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int,
     mem.io.wdata := in.w.bits.data
     mem.io.wmask := fullMask
     mem.io.wen := wen
-    mem.io.en := true.B
+    mem.io.en := ren
     mem.io.rdata
   } else {
     val mem = Mem(memByte / DataBytes, Vec(DataBytes, UInt(8.W)))

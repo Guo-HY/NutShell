@@ -19,7 +19,6 @@ package nutcore
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
-
 import utils._
 import difftest._
 import top.Settings
@@ -69,13 +68,14 @@ object ALUOpType {
 class ALUIO extends FunctionUnitIO {
   val cfIn = Flipped(new CtrlFlowIO)
   val redirect = new RedirectIO
-  val offset = Input(UInt(XLEN.W))
+  val offset = Input(UInt(XLEN.W)) // offset equals to imm, wire connect in EXU
 }
 
-class ALU(hasBru: Boolean = false) extends NutCoreModule {
+abstract class AbstractALU(hasBru: Boolean = false) extends NutCoreModule {
   val io = IO(new ALUIO)
 
   val (valid, src1, src2, func) = (io.in.valid, io.in.bits.src1, io.in.bits.src2, io.in.bits.func)
+
   def access(valid: Bool, src1: UInt, src2: UInt, func: UInt): UInt = {
     this.valid := valid
     this.src1 := src1
@@ -83,6 +83,9 @@ class ALU(hasBru: Boolean = false) extends NutCoreModule {
     this.func := func
     io.out.bits
   }
+}
+
+class ALU(hasBru : Boolean = false) extends AbstractALU {
 
   val isAdderSub = !ALUOpType.isAdd(func)
   val adderRes = (src1 +& (src2 ^ Fill(XLEN, isAdderSub))) + isAdderSub
@@ -176,5 +179,42 @@ class ALU(hasBru: Boolean = false) extends NutCoreModule {
     BoringUtils.addSource(wrong && func === ALUOpType.jalr, "MbpIWrong")
     BoringUtils.addSource(right && func === ALUOpType.ret, "MbpRRight")
     BoringUtils.addSource(wrong && func === ALUOpType.ret, "MbpRWrong")
+  }
+}
+
+object La32rALUOpType {
+  def addw = 1.U
+  def subw = 2.U
+  def addiw = 3.U
+}
+
+class La32rALU(hasBru : Boolean = false) extends AbstractALU {
+
+  val rj = src1
+  val rk = src2
+  val imm = io.offset
+
+  val signExtI12 = SignExt(imm(11, 0), XLEN)
+
+  val isAdderSub = func =/= La32rALUOpType.addiw && func =/= La32rALUOpType.addw
+  val adderRes = (rj +& (rk ^ Fill(XLEN, isAdderSub))) + isAdderSub
+
+  val res = LookupTreeDefault(func, adderRes, List(
+    La32rALUOpType.addw   -> adderRes,
+    La32rALUOpType.subw   -> adderRes,
+    La32rALUOpType.addiw  -> (rj + signExtI12),
+  ))
+
+  io.out.bits := res
+
+  io.redirect := DontCare
+
+  io.in.ready := io.out.ready
+  io.out.valid := valid
+
+  val bpuUpdateReq = WireInit(0.U.asTypeOf(new BPUUpdateReq))
+
+  if (hasBru) {
+    BoringUtils.addSource(RegNext(bpuUpdateReq), "bpuUpdateReq")
   }
 }

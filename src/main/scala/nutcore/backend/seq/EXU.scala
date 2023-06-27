@@ -43,7 +43,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   val fuValids = Wire(Vec(FuType.num, Bool()))
   (0 until FuType.num).map (i => fuValids(i) := (fuType === i.U) && io.in.valid && !io.flush)
 
-  val alu = Module(new ALU(hasBru = true))
+  val alu = if (IsLa32r) Module(new La32rALU(hasBru = true)) else Module(new ALU(hasBru = true))
   val aluOut = alu.access(valid = fuValids(FuType.alu), src1 = src1, src2 = src2, func = fuOpType)
   alu.io.cfIn := io.in.bits.cf
   alu.io.offset := io.in.bits.data.imm

@@ -18,6 +18,7 @@ package nutcore
 
 import chisel3._
 import chisel3.util._
+import nutcore.Instructions.InstrN
 
 trait HasInstrType {
   def InstrN  = "b0000".U
@@ -31,6 +32,21 @@ trait HasInstrType {
   def InstrSA = "b1111".U // Atom Inst: SC
 
   def isrfWen(instrType : UInt): Bool = instrType(2)
+}
+
+trait HasLa32rInstrType {
+  def Instr2R     = "b0000".U
+  def Instr3R     = "b0001".U
+//  def Instr4R     = "b0010".U
+  def Instr2RI8   = "b0011".U
+  def Instr2RI12  = "b0100".U
+  def Instr2RI14  = "b0101".U
+  def Instr2RI16  = "b0110".U
+  def Instr1RI21  = "b0111".U
+  def InstrI26    = "b1000".U
+  def Instr1RI20  = "b1001".U
+  def Instr2RI5   = "b1010".U
+  def InstrN      = "b1111".U // the instruction is not a legal instr
 }
 
 // trait CompInstConst {
@@ -85,4 +101,10 @@ object CInstructions extends HasInstrType with HasNutCoreParameter{
   val DecodeDefault = List(RVCInstr.ImmNone, RVCInstr.DtCare, RVCInstr.DtCare, RVCInstr.DtCare)
   // val DecodeDefault = List(InstrN, FuType.csr, CSROpType.jmp)
   def CExtraDecodeTable = RVCInstr.cExtraTable
+}
+
+object La32rInstructions extends HasLa32rInstrType with HasNutCoreParameter {
+  def NOP = "b0 0 0 0 0 0 1 1 0 1_000000000000_00000_00000".U // andi r0, r0, 0
+  val DecodeDefault = List(InstrN, FuType.csr, CSROpType.jmp, false.B) // TODO : update this
+  def DecodeTable = LA32R_ALUInstr.table
 }

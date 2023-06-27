@@ -34,6 +34,7 @@ class SimTop extends Module {
     val logCtrl = new LogCtrlIO
     val perfInfo = new PerfInfoIO
     val uart = new UARTIO
+    val timer = Output(UInt(64.W))
   })
 
   lazy val config = NutCoreConfig(FPGAPlatform = false)
@@ -66,5 +67,9 @@ class SimTop extends Module {
   val dummyWire = WireInit(false.B)
   BoringUtils.addSink(dummyWire, "DISPLAY_ENABLE")
 
+  BoringUtils.addSource(io.logCtrl.log_level, "DISPLAY_LOG_LEVEL")
+
   io.uart <> mmio.io.uart
+
+  io.timer := GTimer()
 }

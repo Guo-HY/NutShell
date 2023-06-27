@@ -10,9 +10,9 @@ USE_READY_TO_RUN_NEMU = true
 SIMTOP = top.TopMain
 IMAGE ?= ready-to-run/linux.bin
 
-DATAWIDTH ?= 64
+DATAWIDTH ?= 32
 BOARD ?= sim  # sim  pynq  axu3cg
-CORE  ?= inorder  # inorder  ooo  embedded
+CORE  ?= la32r  # inorder  ooo  embedded la32r
 
 .DEFAULT_GOAL = verilog
 

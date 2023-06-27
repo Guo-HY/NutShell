@@ -23,13 +23,16 @@ import chisel3.util.experimental.BoringUtils
 import utils._
 import difftest._
 
-class Decoder(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType {
+abstract class AbstractDecoder(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new CtrlFlowIO))
     val out = Decoupled(new DecodeIO)
-    val isWFI = Output(Bool()) // require NutCoreSim to advance mtime when wfi to reduce the idle time in Linux
+    val isWFI = Output(Bool()) // require NutCoreSim to advance mtime when wfi to reduce the idle time in Linux, do not use in la32r
     val isBranch = Output(Bool())
   })
+}
+
+class Decoder(implicit override val p: NutCoreConfig) extends AbstractDecoder with HasInstrType {
 
   val hasIntr = Wire(Bool())
   val instr = io.in.bits.instr
@@ -189,13 +192,93 @@ class Decoder(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstr
 
 }
 
+class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecoder with HasLa32rInstrType {
+
+  val hasIntr = Wire(Bool())
+  val instr = io.in.bits.instr
+  val decodeList = ListLookup(instr, La32rInstructions.DecodeDefault, La32rInstructions.DecodeTable)
+  val instrType :: fuType :: fuOpType :: isrfWen :: Nil = decodeList // TODO : add exception handle
+
+  io.out.bits := DontCare
+  io.isBranch := DontCare
+  io.isWFI := DontCare
+
+  io.out.bits.ctrl.fuType := fuType
+  io.out.bits.ctrl.fuOpType := fuOpType
+
+  // use SrcType.imm when we do not need reg source
+  // rj is src1, rk is src2, rd is dest
+  val SrcTypeTable = List(
+    Instr2R     -> (SrcType.reg, SrcType.imm),
+    Instr3R     -> (SrcType.reg, SrcType.reg),
+    Instr2RI8   -> (SrcType.reg, SrcType.imm),
+    Instr2RI12  -> (SrcType.reg, SrcType.imm),
+    Instr2RI14  -> (SrcType.reg, SrcType.imm),
+    Instr2RI16  -> (SrcType.reg, SrcType.imm),
+    Instr1RI21  -> (SrcType.reg, SrcType.imm),
+    InstrI26    -> (SrcType.imm, SrcType.imm),
+    Instr1RI20  -> (SrcType.imm, SrcType.imm),
+    Instr2RI5   -> (SrcType.reg, SrcType.imm)
+  )
+
+  val src1Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._1)))
+  val src2Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._2)))
+
+  val (rk, rj, rd) = (instr(14, 10), instr(9, 5), instr(4, 0))
+  val rfSrc1 = rj
+  val rfSrc2 = rk
+  val rfDest = rd
+
+  io.out.bits.ctrl.rfSrc1 := Mux(src1Type === SrcType.imm , 0.U, rfSrc1)
+  io.out.bits.ctrl.rfSrc2 := Mux(src2Type === SrcType.imm , 0.U, rfSrc2)
+  io.out.bits.ctrl.rfWen := isrfWen
+  io.out.bits.ctrl.rfDest := Mux(isrfWen.asBool, rfDest, 0.U)
+
+
+  // unlike riscv implementation, we just give imm at lower bits without SignExt
+  val imm = LookupTree(instrType, List(
+    Instr2RI8     -> ZeroExt(instr(17, 10), XLEN),
+    Instr2RI12    -> ZeroExt(instr(21, 10), XLEN),
+    Instr2RI14    -> ZeroExt(instr(23, 10), XLEN),
+    Instr2RI16    -> ZeroExt(instr(25, 10), XLEN),
+    Instr1RI21    -> ZeroExt(Cat(instr(4, 0), instr(25, 10)), XLEN),
+    InstrI26      -> ZeroExt(Cat(instr(9, 0), instr(25, 10)), XLEN),
+    Instr1RI20    -> ZeroExt(instr(24, 5), XLEN),
+    Instr2RI5     -> ZeroExt(instr(14, 10), XLEN)
+  ))
+  io.out.bits.data.imm := imm
+
+  io.out.bits.ctrl.src1Type := src1Type
+  io.out.bits.ctrl.src2Type := src2Type
+
+  io.out.valid := io.in.valid
+  io.in.ready := !io.in.valid || io.out.fire() && !hasIntr
+  io.out.bits.cf <> io.in.bits
+
+  val intrVec = WireInit(0.U(12.W))
+  BoringUtils.addSink(intrVec, "intrVecIDU")
+  io.out.bits.cf.intrVec.zip(intrVec.asBools).map { case (x, y) => x := y }
+  hasIntr := intrVec.orR
+
+  io.out.bits.cf.exceptionVec.map(_ := false.B)
+  io.out.bits.cf.exceptionVec(illegalInstr) := (instrType === InstrN && !hasIntr) && io.in.valid
+
+  // TODO : just for debug
+  when (io.out.bits.cf.exceptionVec(illegalInstr) === true.B) {
+    LADebug(true.B, "decode detecte illegal instr=0x%x\n", instr)
+    assert(false.B)
+  }
+
+
+}
+
 class IDU(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType {
   val io = IO(new Bundle {
     val in = Vec(2, Flipped(Decoupled(new CtrlFlowIO)))
     val out = Vec(2, Decoupled(new DecodeIO))
   })
-  val decoder1  = Module(new Decoder)
-  val decoder2  = Module(new Decoder)
+  val decoder1  = if (IsLa32r) Module(new La32rDecoder) else Module(new Decoder)
+  val decoder2  = if (IsLa32r) Module(new La32rDecoder) else Module(new Decoder)
   io.in(0) <> decoder1.io.in
   io.in(1) <> decoder2.io.in
   io.out(0) <> decoder1.io.out

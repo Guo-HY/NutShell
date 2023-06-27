@@ -23,15 +23,14 @@ import utils.LogLevel.LogLevel
 
 import nutcore.NutCoreConfig
 
-object LogLevel extends Enumeration {
-  type LogLevel = Value
-
-  val ALL   = Value(0, "ALL  ")
-  val DEBUG = Value("DEBUG")
-  val INFO  = Value("INFO ")
-  val WARN  = Value("WARN ")
-  val ERROR = Value("ERROR")
-  val OFF   = Value("OFF  ")
+object LogLevel  {
+  type LogLevel = UInt
+  val LADEBUG = 1.U(64.W)
+  val DEBUG = 2.U(64.W)
+  val INFO  = 4.U(64.W)
+  val WARN  = 8.U(64.W)
+  val ERROR = 16.U(64.W)
+  val OFF   = 0.U(64.W)
 }
 
 object LogUtil {
@@ -42,17 +41,17 @@ object LogUtil {
     enableDisplay
   }
 
-  // def LogLevel: UInt = {
-  //   val log_level = WireInit(0.U(64.W))
-  //   BoringUtils.addSink(log_level, "DISPLAY_LOG_LEVEL")
-  //   log_level
-  // }
+   def getLogLevel: UInt = {
+     val log_level = WireInit(0.U(64.W))
+     BoringUtils.addSink(log_level, "DISPLAY_LOG_LEVEL")
+     log_level
+   }
 
   def apply(debugLevel: LogLevel)
            (prefix: Boolean, cond: Bool, pable: Printable)
            (implicit name: String): Any = {
     val commonInfo = p"[${GTimer()}] $name: "
-    when (cond && displayLog) {
+    when (cond && displayLog && (getLogLevel & debugLevel).orR) {
       if(prefix) printf(commonInfo)
       printf(pable)
     }
@@ -83,7 +82,7 @@ sealed abstract class LogHelper(val logLevel: LogLevel) {
     }
   }
 }
-
+object LADebug extends LogHelper(LogLevel.LADEBUG)
 object Debug extends LogHelper(LogLevel.DEBUG)
 object Info extends LogHelper(LogLevel.INFO)
 object Warn extends LogHelper(LogLevel.WARN)

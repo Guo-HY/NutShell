@@ -668,7 +668,7 @@ class Cache_dummy(implicit val cacheConfig: CacheConfig) extends CacheModule wit
 object Cache {
   def apply(in: SimpleBusUC, mmio: Seq[SimpleBusUC], flush: UInt, empty: Bool, enable: Boolean = true)(implicit cacheConfig: CacheConfig) = {
     val cache = if (enable) Module(new Cache) 
-                else (if (Settings.get("IsRV32")) 
+                else (if (Settings.get("IsRV32") || Settings.get("IsLa32r"))
                         (if (cacheConfig.name == "dcache") Module(new Cache_fake) else Module(new Cache_dummy)) 
                       else 
                         (Module(new Cache_fake)))

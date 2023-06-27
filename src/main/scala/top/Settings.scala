@@ -94,6 +94,23 @@ object EmbededSettings {
   )
 }
 
+object La32rSettings {
+  def apply() = Map(
+    "HasL2cache" -> false,
+    "HasPrefetch" -> false,
+    "HasDTLB" -> false,
+    "HasITLB" -> false,
+    "HasDcache" -> false,
+    "HasIcache" -> false,
+    "MmodeOnly" -> true,
+    "IsRV32" -> false,
+    "EnableRVC" -> false,
+    "IsLa32r" -> true,
+    "ResetVector" -> 0x1c000000L,
+    "EnableILA" -> false,
+  )
+}
+
 object Settings {
   var settings: Map[String, AnyVal] = DefaultSettings()
   def get(field: String) = {

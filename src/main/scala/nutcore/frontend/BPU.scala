@@ -24,7 +24,7 @@ import utils._
 import top.Settings
 
 class TableAddr(val idxBits: Int) extends NutCoreBundle {
-  val padLen = if (Settings.get("IsRV32") || !Settings.get("EnableOutOfOrderExec")) 2 else 3
+  val padLen = if (Settings.get("IsRV32") || Settings.get("IsLa32r") || !Settings.get("EnableOutOfOrderExec")) 2 else 3
   def tagBits = VAddrBits - padLen - idxBits
 
   //val res = UInt((AddrBits - VAddrBits).W)
