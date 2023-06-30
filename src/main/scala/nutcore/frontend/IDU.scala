@@ -223,6 +223,7 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     Instr2RI5   -> (SrcType.reg, SrcType.imm),
     InstrBranch -> (SrcType.reg, SrcType.reg),
     InstrStore  -> (SrcType.reg, SrcType.reg),
+    Instr2RI12ZEXT -> (SrcType.reg, SrcType.imm),
   )
 
   val src1Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._1)))
@@ -240,18 +241,18 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   io.out.bits.ctrl.rfDest := Mux(isrfWen.asBool, rfDest, 0.U)
 
 
-  // unlike riscv implementation, we just give imm at lower bits without SignExt
   val imm = LookupTree(instrType, List(
-    Instr2RI8     -> ZeroExt(instr(17, 10), XLEN),
-    Instr2RI12    -> ZeroExt(instr(21, 10), XLEN),
-    Instr2RI14    -> ZeroExt(instr(23, 10), XLEN),
-    Instr2RI16    -> ZeroExt(instr(25, 10), XLEN),
-    Instr1RI21    -> ZeroExt(Cat(instr(4, 0), instr(25, 10)), XLEN),
-    InstrI26      -> ZeroExt(Cat(instr(9, 0), instr(25, 10)), XLEN),
-    Instr1RI20    -> ZeroExt(instr(24, 5), XLEN),
+    Instr2RI8     -> SignExt(instr(17, 10), XLEN),
+    Instr2RI12    -> SignExt(instr(21, 10), XLEN),
+    Instr2RI14    -> SignExt(instr(23, 10), XLEN),
+    Instr2RI16    -> SignExt(instr(25, 10), XLEN),
+    Instr1RI21    -> SignExt(Cat(instr(4, 0), instr(25, 10)), XLEN),
+    InstrI26      -> SignExt(Cat(instr(9, 0), instr(25, 10)), XLEN),
+    Instr1RI20    -> SignExt(instr(24, 5), XLEN),
     Instr2RI5     -> ZeroExt(instr(14, 10), XLEN),
-    InstrBranch   -> ZeroExt(instr(25, 10), XLEN),
-    InstrStore    -> ZeroExt(instr(21, 10), XLEN),
+    InstrBranch   -> SignExt(instr(25, 10), XLEN),
+    InstrStore    -> SignExt(instr(21, 10), XLEN),
+    Instr2RI12ZEXT -> ZeroExt(instr(21, 10), XLEN),
   ))
   io.out.bits.data.imm := imm
 

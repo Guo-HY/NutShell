@@ -911,13 +911,13 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
     difftest.io.mideleg := RegNext(mideleg)
     difftest.io.medeleg := RegNext(medeleg)
 
-    val difftestArchEvent = Module(new DifftestArchEvent)
-    difftestArchEvent.io.clock := clock
-    difftestArchEvent.io.coreid := 0.U // TODO
-    difftestArchEvent.io.intrNO := RegNext(RegNext(Mux(raiseIntr && io.instrValid && valid, intrNO, 0.U)))
-    difftestArchEvent.io.cause := RegNext(RegNext(Mux(raiseException && io.instrValid && valid, exceptionNO, 0.U)))
-    difftestArchEvent.io.exceptionPC := RegNext(RegNext(SignExt(io.cfIn.pc, XLEN)))
-    difftestArchEvent.io.exceptionInst := RegNext(RegNext(io.cfIn.instr))
+//    val difftestArchEvent = Module(new DifftestArchEvent)
+//    difftestArchEvent.io.clock := clock
+//    difftestArchEvent.io.coreid := 0.U // TODO
+//    difftestArchEvent.io.intrNO := RegNext(RegNext(Mux(raiseIntr && io.instrValid && valid, intrNO, 0.U)))
+//    difftestArchEvent.io.cause := RegNext(RegNext(Mux(raiseException && io.instrValid && valid, exceptionNO, 0.U)))
+//    difftestArchEvent.io.exceptionPC := RegNext(RegNext(SignExt(io.cfIn.pc, XLEN)))
+//    difftestArchEvent.io.exceptionInst := RegNext(RegNext(io.cfIn.instr))
 
   } else {
     if (!p.FPGAPlatform) {

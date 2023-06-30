@@ -102,6 +102,6 @@ class ISU(implicit val p: NutCoreConfig) extends NutCoreModule with HasRegFilePa
     val difftest = Module(new DifftestArchIntRegState)
     difftest.io.clock  := clock
     difftest.io.coreid := 0.U // TODO
-    difftest.io.gpr    := VecInit((0 to NRReg-1).map(i => rf.read(i.U)))
+    difftest.io.gpr    := VecInit((0 to NRReg-1).map(i => rf.read((i).U)))
   }
 }

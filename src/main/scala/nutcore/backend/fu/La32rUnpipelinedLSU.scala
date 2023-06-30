@@ -148,14 +148,14 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
 
   // note : we can add store check there because now we use inorder backend
   // storeData format need align with la32r-nemu,(see NEMU/src/memory/paddr.c : store_commit_queue_push)
-  if (!p.FPGAPlatform) {
-    val storeDiff = Module(new DifftestStoreEvent())
-    storeDiff.io.clock := clock
-    storeDiff.io.valid := dmem.req.fire && isStore
-    storeDiff.io.storeAddr := vaddr // TODO : we just use vaddr for check because now we doesn't have tlb
-    val offset = vaddr(1, 0)
-    storeDiff.io.storeData := Mux(La32rLSUOpType.isByteOp(holdFunc), (holdWdata & 0xff.U) << (offset << 3),
-      Mux(La32rLSUOpType.isHalfOp(holdFunc), (holdWdata & 0xffff.U) << (offset << 3), holdWdata))
-    storeDiff.io.storeMask := DontCare
-  }
+//  if (!p.FPGAPlatform) {
+//    val storeDiff = Module(new DifftestStoreEvent())
+//    storeDiff.io.clock := clock
+//    storeDiff.io.valid := dmem.req.fire && isStore
+//    storeDiff.io.storeAddr := vaddr // TODO : we just use vaddr for check because now we doesn't have tlb
+//    val offset = vaddr(1, 0)
+//    storeDiff.io.storeData := Mux(La32rLSUOpType.isByteOp(holdFunc), (holdWdata & 0xff.U) << (offset << 3),
+//      Mux(La32rLSUOpType.isHalfOp(holdFunc), (holdWdata & 0xffff.U) << (offset << 3), holdWdata))
+//    storeDiff.io.storeMask := DontCare
+//  }
 }

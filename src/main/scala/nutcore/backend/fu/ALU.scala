@@ -183,9 +183,19 @@ class ALU(hasBru : Boolean = false) extends AbstractALU {
 }
 
 object La32rALUOpType {
-  def addw    = "b0000001".U
-  def subw    = "b0000010".U
-  def addiw   = "b0000011".U
+  def add   = 1.U
+  def sub   = 2.U
+  def lu12i = 3.U
+  def slt   = 4.U
+  def sltu  = 5.U
+  def pcaddu12i = 6.U
+  def and = 7.U
+  def or = 8.U
+  def nor = 9.U
+  def xor = 10.U
+  def sll = 11.U
+  def srl = 12.U
+  def sra = 13.U
 
   // control flow instruction
   // func(4) is always 1
@@ -208,6 +218,7 @@ object La32rALUOpType {
   def isJump(func: UInt) = func(3) // jump === unconditional cfi
 }
 
+// note : when src1 is not reg, it is pc, when src2 is not reg, it is imm, see ISU
 class La32rALU(hasBru : Boolean = false) extends AbstractALU {
 
   val rj = src1
@@ -215,15 +226,27 @@ class La32rALU(hasBru : Boolean = false) extends AbstractALU {
   val branchRd = src2
   val imm = io.offset
 
-  val signExtI12 = SignExt(imm(11, 0), XLEN)
-
-  val isAdderSub = func =/= La32rALUOpType.addiw && func =/= La32rALUOpType.addw
-  val adderRes = (rj +& (rk ^ Fill(XLEN, isAdderSub))) + isAdderSub
+  val isAdderSub = func =/= La32rALUOpType.add
+  val adderRes = (src1 +& (src2 ^ Fill(XLEN, isAdderSub))) + isAdderSub
+  val orRes = src1 | src2
+  val sllRes = src1 << src2(4, 0)
+  val srlRes = src1 >> src2(4, 0)
+  val sraRes = (src1.asSInt() >> src2(4, 0)).asUInt()
 
   val aluRes = LookupTreeDefault(func, adderRes, List(
-    La32rALUOpType.addw   -> adderRes,
-    La32rALUOpType.subw   -> adderRes,
-    La32rALUOpType.addiw  -> (rj + signExtI12),
+    La32rALUOpType.add   -> adderRes,
+    La32rALUOpType.sub   -> adderRes,
+    La32rALUOpType.slt   -> (rj.asSInt() < rk.asSInt()),
+    La32rALUOpType.sltu  -> (rj < rk),
+    La32rALUOpType.nor   -> ~orRes,
+    La32rALUOpType.and   -> (rj & rk),
+    La32rALUOpType.or    -> orRes,
+    La32rALUOpType.xor   -> (rj ^ rk),
+    La32rALUOpType.sll   -> sllRes,
+    La32rALUOpType.srl   -> srlRes,
+    La32rALUOpType.sra   -> sraRes,
+    La32rALUOpType.lu12i -> Cat(src2(19, 0), 0.U(12.W)),
+    La32rALUOpType.pcaddu12i -> (src1 + Cat(src2(19, 0), 0.U(12.W))),
   ))
 
   val branchTakenTable = List(
@@ -244,9 +267,11 @@ class La32rALU(hasBru : Boolean = false) extends AbstractALU {
   val taken = (isBranch && branchTaken) | La32rALUOpType.isJump(func)
   val takenTarget = Mux(isBranch, branchTakenTarget,
     Mux(func === La32rALUOpType.call || func === La32rALUOpType.b, directJumpTarget, indirectJumpTarget))
-  val predictWrong = (io.cfIn.brIdx(0) ^ taken) | (taken && io.cfIn.pnpc =/= takenTarget) // direction fail or target fail
+  val predictWrong = isBru && ((io.cfIn.brIdx(0) ^ taken) | (taken && io.cfIn.pnpc =/= takenTarget)) // direction fail or target fail
 
-  io.redirect.valid := predictWrong
+  LADebug(valid && predictWrong, "[BPW] instr=0x%x, pc=0x%x,taken=%d,redirectTarget=0x%x, indirectJumpTarget=0x%x, rj=0x%x\n",
+    io.cfIn.instr, io.cfIn.pc, taken, io.redirect.target, indirectJumpTarget, rj)
+  io.redirect.valid := valid && predictWrong
   io.redirect.target := Mux(taken, takenTarget, io.cfIn.pc + 4.U)
   val redirectRtype = if (EnableOutOfOrderExec) 1.U else 0.U // TODO : what is this
   io.redirect.rtype := redirectRtype
