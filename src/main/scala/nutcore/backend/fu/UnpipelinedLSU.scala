@@ -31,6 +31,7 @@ class UnpipeLSUIO extends FunctionUnitIO {
   val dtlbPF = Output(Bool()) // TODO: refactor it for new backend
   val loadAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
   val storeAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
+  val storeCheck = new StoreCheckIO
 }
 
 abstract class AbstractUnpipelinedLSU(implicit val p: NutCoreConfig) extends NutCoreModule with HasLSUConst {
@@ -289,6 +290,8 @@ class UnpipelinedLSU(implicit override val p: NutCoreConfig) extends AbstractUnp
 
     io.loadAddrMisaligned := lsExecUnit.io.loadAddrMisaligned
     io.storeAddrMisaligned := lsExecUnit.io.storeAddrMisaligned
+
+    io.storeCheck := DontCare
 }
 
 class LSExecUnit extends NutCoreModule {

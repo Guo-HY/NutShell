@@ -68,6 +68,12 @@ class CtrlFlowIO extends NutCoreBundle {
   val isBranch = Output(Bool())
 }
 
+class StoreCheckIO extends NutCoreBundle {
+  val valid = Output(Bool())
+  val storeAddr = Output(UInt(64.W))
+  val storeData = Output(UInt(64.W))
+}
+
 class DecodeIO extends NutCoreBundle {
   val cf = new CtrlFlowIO
   val ctrl = new CtrlSignalIO
@@ -85,6 +91,7 @@ class CommitIO extends NutCoreBundle {
   val isMMIO = Output(Bool())
   val intrNO = Output(UInt(XLEN.W))
   val commits = Output(Vec(FuType.num, UInt(XLEN.W)))
+  val storeCheck = new StoreCheckIO
 }
 
 class OOCommitIO extends NutCoreBundle with HasBackendConst{

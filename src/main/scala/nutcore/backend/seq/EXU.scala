@@ -58,6 +58,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   lsu.io.instr := io.in.bits.cf.instr
   io.out.bits.isMMIO := lsu.io.isMMIO || (AddressSpace.isMMIO(io.in.bits.cf.pc) && io.out.valid)
   io.dmem <> lsu.io.dmem
+  io.out.bits.storeCheck := lsu.io.storeCheck
   lsu.io.out.ready := true.B
 
   val mdu = Module(new MDU)

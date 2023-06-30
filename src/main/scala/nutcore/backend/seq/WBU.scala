@@ -91,6 +91,15 @@ class WBU(implicit val p: NutCoreConfig) extends NutCoreModule{
     // when(runahead_commit.io.valid) {
     //   printf("DUT commit branch %x\n", runahead_commit.io.pc)
     // }
+
+    val diffStore = Module(new DifftestStoreEvent)
+    diffStore.io.clock := clock
+    diffStore.io.coreid := 0.U
+    diffStore.io.index := 0.U
+    diffStore.io.valid := RegNext(io.in.valid && io.in.bits.storeCheck.valid)
+    diffStore.io.storeAddr := RegNext(io.in.bits.storeCheck.storeAddr)
+    diffStore.io.storeData := RegNext(io.in.bits.storeCheck.storeData)
+    diffStore.io.pc := RegNext(io.in.bits.decode.cf.pc)
   } else {
     BoringUtils.addSource(io.in.valid, "ilaWBUvalid")
     BoringUtils.addSource(io.in.bits.decode.cf.pc, "ilaWBUpc")
