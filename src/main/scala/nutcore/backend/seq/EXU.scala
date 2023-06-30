@@ -51,7 +51,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   def isBru(func: UInt) = func(4)
 
-  val lsu = Module(new UnpipelinedLSU)
+  val lsu = if(IsLa32r) Module(new La32rUnpipelinedLSU) else Module(new UnpipelinedLSU)
   val lsuTlbPF = WireInit(false.B)
   val lsuOut = lsu.access(valid = fuValids(FuType.lsu), src1 = src1, src2 = io.in.bits.data.imm, func = fuOpType, dtlbPF = lsuTlbPF)
   lsu.io.wdata := src2
@@ -103,6 +103,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   Debug(mou.io.redirect.valid || csr.io.redirect.valid || alu.io.redirect.valid, "[REDIRECT] flush: %d mou %x csr %x alu %x\n", io.flush, mou.io.redirect.target, csr.io.redirect.target, alu.io.redirect.target)
 
   // FIXME: should handle io.out.ready == false
+  // TODO : may has perf bug
   io.out.valid := io.in.valid && MuxLookup(fuType, true.B, List(
     FuType.lsu -> lsu.io.out.valid,
     FuType.mdu -> mdu.io.out.valid

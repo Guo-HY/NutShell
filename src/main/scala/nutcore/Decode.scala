@@ -47,6 +47,7 @@ trait HasLa32rInstrType {
   def Instr1RI20  = "b1001".U
   def Instr2RI5   = "b1010".U
   def InstrBranch = "b1011".U
+  def InstrStore  = "b1100".U
   def InstrN      = "b1111".U // the instruction is not a legal instr
 }
 

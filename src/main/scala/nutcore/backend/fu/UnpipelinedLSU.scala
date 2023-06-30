@@ -33,9 +33,10 @@ class UnpipeLSUIO extends FunctionUnitIO {
   val storeAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
 }
 
-class UnpipelinedLSU extends NutCoreModule with HasLSUConst {
+abstract class AbstractUnpipelinedLSU(implicit val p: NutCoreConfig) extends NutCoreModule with HasLSUConst {
   val io = IO(new UnpipeLSUIO)
   val (valid, src1, src2, func) = (io.in.valid, io.in.bits.src1, io.in.bits.src2, io.in.bits.func)
+
   def access(valid: Bool, src1: UInt, src2: UInt, func: UInt, dtlbPF: Bool): UInt = {
     this.valid := valid
     this.src1 := src1
@@ -44,6 +45,10 @@ class UnpipelinedLSU extends NutCoreModule with HasLSUConst {
     dtlbPF := io.dtlbPF
     io.out.bits
   }
+}
+
+class UnpipelinedLSU(implicit override val p: NutCoreConfig) extends AbstractUnpipelinedLSU {
+
     val lsExecUnit = Module(new LSExecUnit)
     lsExecUnit.io.instr := DontCare
     io.dtlbPF := lsExecUnit.io.dtlbPF

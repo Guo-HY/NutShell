@@ -19,9 +19,9 @@ package nutcore
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
-
 import utils._
 import difftest._
+import nutcore.LA32R_LSUInstr.InstrStore
 
 abstract class AbstractDecoder(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle {
@@ -222,6 +222,7 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     Instr1RI20  -> (SrcType.imm, SrcType.imm),
     Instr2RI5   -> (SrcType.reg, SrcType.imm),
     InstrBranch -> (SrcType.reg, SrcType.reg),
+    InstrStore  -> (SrcType.reg, SrcType.reg),
   )
 
   val src1Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._1)))
@@ -229,7 +230,8 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
 
   val (rk, rj, rd) = (instr(14, 10), instr(9, 5), instr(4, 0))
   val rfSrc1 = rj
-  val rfSrc2 = Mux(fuType === FuType.bru && La32rALUOpType.isBranch(outFuOpType), rd, rk)
+  val rfSrc2 = Mux(fuType === FuType.bru && La32rALUOpType.isBranch(outFuOpType)
+    || fuType === FuType.lsu && La32rLSUOpType.isStore(outFuOpType), rd, rk)
   val rfDest = Mux(fuType === FuType.bru && (fuOpType === La32rALUOpType.call), 1.U ,rd)
 
   io.out.bits.ctrl.rfSrc1 := Mux(src1Type === SrcType.imm , 0.U, rfSrc1)
@@ -247,7 +249,9 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     Instr1RI21    -> ZeroExt(Cat(instr(4, 0), instr(25, 10)), XLEN),
     InstrI26      -> ZeroExt(Cat(instr(9, 0), instr(25, 10)), XLEN),
     Instr1RI20    -> ZeroExt(instr(24, 5), XLEN),
-    Instr2RI5     -> ZeroExt(instr(14, 10), XLEN)
+    Instr2RI5     -> ZeroExt(instr(14, 10), XLEN),
+    InstrBranch   -> ZeroExt(instr(25, 10), XLEN),
+    InstrStore    -> ZeroExt(instr(21, 10), XLEN),
   ))
   io.out.bits.data.imm := imm
 
