@@ -214,8 +214,8 @@ object La32rALUOpType {
 
 
   def isBru(func: UInt) = func(4)
-  def isBranch(func: UInt) = !func(3) // branch === conditional cfi
-  def isJump(func: UInt) = func(3) // jump === unconditional cfi
+  def isBranch(func: UInt) = func(4) && !func(3) // branch === conditional cfi
+  def isJump(func: UInt) = func(4) && func(3) // jump === unconditional cfi
 }
 
 // note : when src1 is not reg, it is pc, when src2 is not reg, it is imm, see ISU
