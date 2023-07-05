@@ -32,6 +32,7 @@ class UnpipeLSUIO extends FunctionUnitIO {
   val loadAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
   val storeAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
   val storeCheck = new StoreCheckIO
+  val pc = Input(UInt(XLEN.W))
 }
 
 abstract class AbstractUnpipelinedLSU(implicit val p: NutCoreConfig) extends NutCoreModule with HasLSUConst {

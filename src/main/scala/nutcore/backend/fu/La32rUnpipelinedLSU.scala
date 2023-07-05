@@ -137,6 +137,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
 
   Debug(io.loadAddrMisaligned || io.storeAddrMisaligned, "misaligned addr detected\n")
 
+  LADebug(dmem.req.fire, "[LSUREQ]pc=0x%x instr=0x%x vaddr=0x%x size=%d wdata=0x%x wmask=0x%x cmd=%d",
+    io.pc, io.instr, vaddr, size, dmem.req.bits.wdata, dmem.req.bits.wmask, dmem.req.bits.cmd)
+
+  LADebug(io.out.fire, "[LSURESP]pc=0x%x instr=0x%x rdata=0x%x", io.pc, io.instr, io.out.bits)
+
   // below is temp code to pass firrtl compile
   val lsuMMIO = WireInit(false.B)
   BoringUtils.addSink(lsuMMIO, "lsuMMIO")
