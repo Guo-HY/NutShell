@@ -258,7 +258,7 @@ class IFU_ooo extends NutCoreModule with HasResetVector {
 
 class IFU_embedded extends NutCoreModule with HasResetVector {
   val io = IO(new Bundle {
-    val imem = new SimpleBusUC(userBits = 64, addrBits = VAddrBits)
+    val imem = new SimpleBusUC(userBits = 64 + 4, addrBits = VAddrBits) // userBits need contain brIdx
     val out = Decoupled(new CtrlFlowIO)
     val redirect = Flipped(new RedirectIO)
     val flushVec = Output(UInt(4.W))
@@ -287,21 +287,21 @@ class IFU_embedded extends NutCoreModule with HasResetVector {
   io.bpFlush := false.B
 
   io.imem := DontCare
-  io.imem.req.bits.apply(addr = pc, size = "b10".U, cmd = SimpleBusCmd.read, wdata = 0.U, wmask = 0.U, user = Cat(pc, npc))
+  io.imem.req.bits.apply(addr = pc, size = "b10".U, cmd = SimpleBusCmd.read, wdata = 0.U, wmask = 0.U, user = Cat(Mux(io.redirect.valid, 0.U, Cat(0.U(3.W), bpu.io.out.valid)), pc, npc))
   io.imem.req.valid := io.out.ready
   io.imem.resp.ready := io.out.ready || io.flushVec(0)
 
   io.out.bits := DontCare
   io.out.bits.instr := io.imem.resp.bits.rdata
   io.imem.resp.bits.user.map{ case x =>
+    io.out.bits.brIdx := x(67 ,2*VAddrBits)
     io.out.bits.pc := x(2*VAddrBits-1, VAddrBits)
     io.out.bits.pnpc := x(VAddrBits-1, 0)
   }
   io.out.valid := io.imem.resp.valid && !io.flushVec(0)
-  io.out.bits.brIdx := Cat(0.U(3.W), bpu.io.out.valid)
 
   Debug(io.imem.req.fire(), "[IFI] pc=%x user=%x redirect %x npc %x pc %x pnpc %x\n", io.imem.req.bits.addr, io.imem.req.bits.user.getOrElse(0.U), io.redirect.valid, npc, pc, bpu.io.out.target)
-  Debug(io.out.fire(), "[IFO] pc=%x user=%x inst=%x npc=%x ipf %x\n", io.out.bits.pc, io.imem.resp.bits.user.get, io.out.bits.instr, io.out.bits.pnpc, io.ipf)
+  Debug(io.out.fire(), "[IFO] pc=%x user=%x inst=%x npc=%x ipf %x brIdx=%d\n", io.out.bits.pc, io.imem.resp.bits.user.get, io.out.bits.instr, io.out.bits.pnpc, io.ipf, io.out.bits.brIdx)
 
   BoringUtils.addSource(BoolStopWatch(io.imem.req.valid, io.imem.resp.fire()), "perfCntCondMimemStall")
   BoringUtils.addSource(io.flushVec.orR, "perfCntCondMifuFlush")
