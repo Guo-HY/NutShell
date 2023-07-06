@@ -108,6 +108,7 @@ object La32rSettings {
     "IsLa32r" -> true,
     "ResetVector" -> 0x1c000000L,
     "EnableILA" -> false,
+    "EnablePerfOutput" -> false,
   )
 }
 

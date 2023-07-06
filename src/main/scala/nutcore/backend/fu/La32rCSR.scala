@@ -448,20 +448,22 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
       // display all perfcnt when nutcoretrap is executed
       val PrintPerfCntToCSV = true
       when(nutcoretrap) {
-        printf("======== PerfCnt =========\n")
-        perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
-          printf("%d <- " + name + "\n", readWithScala(addr))
-        }
-        if (PrintPerfCntToCSV) {
-          printf("======== PerfCntCSV =========\n\n")
+        if (Settings.get("EnablePerfOutput")) {
+          printf("======== PerfCnt =========\n")
           perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
-            printf(name + ", ")
+            printf("%d <- " + name + "\n", readWithScala(addr))
           }
-          printf("\n\n\n")
-          perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
-            printf("%d, ", readWithScala(addr))
+          if (PrintPerfCntToCSV) {
+            printf("======== PerfCntCSV =========\n\n")
+            perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
+              printf(name + ", ")
+            }
+            printf("\n\n\n")
+            perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
+              printf("%d, ", readWithScala(addr))
+            }
+            printf("\n\n\n")
           }
-          printf("\n\n\n")
         }
       }
     }
