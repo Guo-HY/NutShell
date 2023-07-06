@@ -187,12 +187,14 @@ class CSRIO extends FunctionUnitIO {
   val imemMMU = Flipped(new MMUIO)
   val dmemMMU = Flipped(new MMUIO)
   val wenFix = Output(Bool())
+  val la32rLSUExcp = Flipped(new La32rLSUExcpIO)
 }
 
-class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
+class AbstractCSR(implicit val p: NutCoreConfig) extends NutCoreModule{
   val io = IO(new CSRIO)
 
   val (valid, src1, src2, func) = (io.in.valid, io.in.bits.src1, io.in.bits.src2, io.in.bits.func)
+
   def access(valid: Bool, src1: UInt, src2: UInt, func: UInt): UInt = {
     this.valid := valid
     this.src1 := src1
@@ -200,6 +202,9 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
     this.func := func
     io.out.bits
   }
+}
+
+class CSR(implicit override val p: NutCoreConfig) extends AbstractCSR  with HasCSRConst {
 
   // CSR define
 
@@ -927,4 +932,6 @@ class CSR(implicit val p: NutCoreConfig) extends NutCoreModule with HasCSRConst{
       BoringUtils.addSource(readWithScala(perfCntList("Minstret")._1), "ilaInstrCnt")
     }
   }
+
+  io.la32rLSUExcp := DontCare
 }

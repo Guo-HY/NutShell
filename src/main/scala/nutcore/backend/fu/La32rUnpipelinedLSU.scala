@@ -97,11 +97,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     wdata = genWdata(holdWdata, size),
     wmask = genWmask(vaddr, size),
     cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read))
-  dmem.req.valid := valid && (state === s_idle) && !io.loadAddrMisaligned && !io.storeAddrMisaligned
+  dmem.req.valid := valid && (state === s_idle) && !io.la32rExcp.hasExcp
   dmem.resp.ready := partialLoad || io.out.ready
 
   io.in.ready := (state === s_idle) && dmem.req.ready
-  io.out.valid := Mux(io.loadAddrMisaligned || io.storeAddrMisaligned, true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
+  io.out.valid := Mux(io.la32rExcp.hasExcp, true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
 
   val rdata = dmem.resp.bits.rdata
   val rdataDelay1 = RegNext(rdata)
@@ -129,13 +129,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     "b10".U -> (vaddr(1, 0) === 0.U)
   ))
 
-  io.loadAddrMisaligned := valid && !isStore && !addrAligned
-  io.storeAddrMisaligned := valid && isStore && !addrAligned
+  io.la32rExcp.hasExcp := io.la32rExcp.ale
+  io.la32rExcp.ale := valid && !addrAligned
+  io.la32rExcp.badv := vaddr
 
-  BoringUtils.addSource(vaddr, "LSUADDR")
-  io.isMMIO := DontCare
-
-  Debug(io.loadAddrMisaligned || io.storeAddrMisaligned, "misaligned addr detected\n")
+  Debug(io.la32rExcp.ale, "misaligned addr detected\n")
 
   LADebug(dmem.req.fire, "[LSUREQ]pc=0x%x instr=0x%x vaddr=0x%x size=%d wdata=0x%x wmask=0x%x cmd=%d",
     io.pc, io.instr, vaddr, size, dmem.req.bits.wdata, dmem.req.bits.wmask, dmem.req.bits.cmd)
@@ -149,6 +147,9 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   BoringUtils.addSink(lr, "lr")
   val lrAddr = WireInit(UInt(AddrBits.W), DontCare)
   BoringUtils.addSink(lrAddr, "lr_addr")
+  io.isMMIO := DontCare
+  io.loadAddrMisaligned := DontCare
+  io.storeAddrMisaligned := DontCare
 
 
   // storeData format need align with la32r-nemu,(see NEMU/src/memory/paddr.c : store_commit_queue_push)

@@ -169,7 +169,7 @@ class Decoder(implicit override val p: NutCoreConfig) extends AbstractDecoder wi
 
   Debug(io.out.fire(), "issue: pc %x npc %x instr %x\n", io.out.bits.cf.pc, io.out.bits.cf.pnpc, io.out.bits.cf.instr)
 
-  val intrVec = WireInit(0.U(12.W))
+  val intrVec = WireInit(0.U(13.W))
   BoringUtils.addSink(intrVec, "intrVecIDU")
   io.out.bits.cf.intrVec.zip(intrVec.asBools).map{ case(x, y) => x := y }
   hasIntr := intrVec.orR
@@ -197,7 +197,9 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   val hasIntr = Wire(Bool())
   val instr = io.in.bits.instr
   val decodeList = ListLookup(instr, La32rInstructions.DecodeDefault, La32rInstructions.DecodeTable)
-  val instrType :: fuType :: fuOpType :: isrfWen :: Nil = decodeList // TODO : add exception handle
+  val instrType :: fuType :: fuOpType :: isrfWen :: Nil =
+    La32rInstructions.DecodeDefault.zip(decodeList).map { case (intr, dec) => Mux(hasIntr, intr, dec) }
+
 
   val outFuOpType = io.out.bits.ctrl.fuOpType // TODO : this is dirty implementation to pass firrtl compile
   io.out.bits := DontCare
@@ -224,6 +226,8 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     InstrBranch -> (SrcType.reg, SrcType.reg),
     InstrStore  -> (SrcType.reg, SrcType.reg),
     Instr2RI12ZEXT -> (SrcType.reg, SrcType.imm),
+    InstrN      -> (SrcType.imm, SrcType.imm),
+    InstrCODE15 -> (SrcType.imm, SrcType.imm),
   )
 
   val src1Type = LookupTree(instrType, SrcTypeTable.map(p => (p._1, p._2._1)))
@@ -253,6 +257,7 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     InstrBranch   -> SignExt(instr(25, 10), XLEN),
     InstrStore    -> SignExt(instr(21, 10), XLEN),
     Instr2RI12ZEXT -> ZeroExt(instr(21, 10), XLEN),
+    InstrCODE15   -> ZeroExt(instr(14, 0), XLEN),
   ))
   io.out.bits.data.imm := imm
 
@@ -266,18 +271,45 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
     }
   }
 
+  // fix csr access inst
+  when (fuType === FuType.csr && fuOpType === La32rCSROpType.csracc) {
+    val csrrj = instr(9, 5)
+    when (csrrj === 0.U) {
+      io.out.bits.ctrl.fuOpType := La32rCSROpType.csrrd
+      io.out.bits.ctrl.src1Type := SrcType.imm
+      io.out.bits.ctrl.src2Type := SrcType.imm
+    }.elsewhen(csrrj === 1.U) {
+      io.out.bits.ctrl.fuOpType := La32rCSROpType.csrwr
+      io.out.bits.ctrl.rfSrc2 := rd
+      io.out.bits.ctrl.src1Type := SrcType.imm
+      io.out.bits.ctrl.src2Type := SrcType.reg
+    }.otherwise {
+      io.out.bits.ctrl.fuOpType := La32rCSROpType.csrxchg
+      io.out.bits.ctrl.rfSrc1 := rj
+      io.out.bits.ctrl.rfSrc2 := rd
+      io.out.bits.ctrl.src1Type := SrcType.reg
+      io.out.bits.ctrl.src2Type := SrcType.reg
+    }
+  }
+
   io.out.valid := io.in.valid
   io.in.ready := !io.in.valid || io.out.fire() && !hasIntr
   io.out.bits.cf <> io.in.bits
 
-  val intrVec = WireInit(0.U(12.W))
+  LADebug(io.out.fire, "[IDU] pc=0x%x,instr=0x%x,fuType=%d,fuOpType=%d,rfSrc1=%d,rfSrc2=%d,imm=0x%x,src1Type=%d,src2Type=%d,rd=%d,rj=%d,rk=%d\n",
+    io.in.bits.pc, io.in.bits.instr, io.out.bits.ctrl.fuType, io.out.bits.ctrl.fuOpType, io.out.bits.ctrl.rfSrc1,
+    io.out.bits.ctrl.rfSrc2, io.out.bits.data.imm, io.out.bits.ctrl.src1Type, io.out.bits.ctrl.src2Type, rd, rj, rk)
+
+  val intrVec = WireInit(0.U(13.W))
   BoringUtils.addSink(intrVec, "intrVecIDU")
   io.out.bits.cf.intrVec.zip(intrVec.asBools).map { case (x, y) => x := y }
   hasIntr := intrVec.orR
 
-  io.out.bits.cf.exceptionVec.map(_ := false.B)
-  io.out.bits.cf.exceptionVec(illegalInstr) := (instrType === InstrN && !hasIntr) && io.in.valid
+  io.out.bits.cf.exceptionVec := io.in.bits.exceptionVec
+  io.out.bits.cf.exceptionVec(INT) := io.in.valid && hasIntr
+  io.out.bits.cf.exceptionVec(INE) := (instrType === InstrN && !hasIntr) && io.in.valid
 
+  io.out.bits.ctrl.isNutCoreTrap := (instr === La32rNutCoreTrap.TRAP) && io.in.valid
   // TODO : just for debug
   when (io.out.bits.cf.exceptionVec(illegalInstr) === true.B) {
     LADebug(true.B, "decode detecte illegal instr=0x%x\n", instr)

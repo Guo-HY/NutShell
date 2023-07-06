@@ -48,6 +48,8 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
 //    val frontend = Flipped(new AXI4)
     val meip = Input(UInt(Settings.getInt("NrExtIntr").W))
     val ila = if (p.FPGAPlatform && EnableILA) Some(Output(new ILABundle)) else None
+    val ipi = Input(Bool()) // inter-core interrupt for la32r
+    val hwi = Input(UInt(8.W)) // hardware interrupt for la32r
   })
 
   val nutcore = Module(new NutCore)
@@ -123,6 +125,12 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
   val meipSync = plic.io.extra.get.meip(0)
   BoringUtils.addSource(meipSync, "meip")
   
+  // la32r outer interrupt
+  if (Settings.get("IsLa32r")) {
+    BoringUtils.addSource(io.ipi, "ipi")
+    BoringUtils.addSource(io.hwi, "hwi")
+  }
+
 
   // ILA
   if (p.FPGAPlatform) {

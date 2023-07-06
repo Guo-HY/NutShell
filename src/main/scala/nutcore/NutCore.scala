@@ -62,7 +62,7 @@ trait HasNutCoreLog { this: RawModule =>
   implicit val moduleName: String = this.name
 }
 
-abstract class NutCoreModule extends Module with HasNutCoreParameter with HasNutCoreConst with HasExceptionNO with HasBackendConst with HasNutCoreLog
+abstract class NutCoreModule extends Module with HasNutCoreParameter with HasNutCoreConst with HasExceptionNO with HasBackendConst with HasNutCoreLog with HasLa32rExceptionNO
 abstract class NutCoreBundle extends Bundle with HasNutCoreParameter with HasNutCoreConst with HasBackendConst
 
 case class NutCoreConfig (

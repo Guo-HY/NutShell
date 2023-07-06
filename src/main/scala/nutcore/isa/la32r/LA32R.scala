@@ -116,15 +116,11 @@ object LA32R_PRIVInstr extends HasLa32rInstrType with HasNutCoreParameter {
 }
 
 object LA32R_MISCInstr extends HasLa32rInstrType with HasNutCoreParameter {
-  def BREAK     = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 0 0_???????????????")
-  def SYSCALL   = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 1 0_???????????????")
-  def CSR       = BitPat("b0 0 0 0 0 1 0 0_??????????????_?????_?????") // need distinguish CSRRD,CSRWR,CSRXCHG by (9,5)
   def CACOP     = BitPat("b0 0 0 0 0 1 1 0 0 0_????????????_?????_?????")
   def TLBSRCH   = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 0_0 0 0 0 0_0 0 0 0 0")
   def TLBRD     = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 1_0 0 0 0 0_0 0 0 0 0")
   def TLBWR     = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 0_0 0 0 0 0_0 0 0 0 0")
   def TLBFILL   = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 1_0 0 0 0 0_0 0 0 0 0")
-  def ERTN      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 1 0_0 0 0 0 0_0 0 0 0 0")
   def IDLE      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 1_???????????????")
   def INVTLB    = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 1 1_?????_?????_?????")
   def PRELD     = BitPat("b0 0 1 0 1 0 1 0 1 1_????????????_?????_?????")
@@ -133,7 +129,24 @@ object LA32R_MISCInstr extends HasLa32rInstrType with HasNutCoreParameter {
   def LLW = BitPat("b0 0 1 0 0 0 0 0_??????????????_?????_?????")
   def SCW = BitPat("b0 0 1 0 0 0 0 1_??????????????_?????_?????")
 
+}
+
+object LA32R_CSRInstr extends HasLa32rInstrType with HasNutCoreParameter {
+  def CSR       = BitPat("b0 0 0 0 0 1 0 0_??????????????_?????_?????") // need distinguish CSRRD,CSRWR,CSRXCHG by (9,5)
+  def RDCNTID   = BitPat("b0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0_?????_00000")
+  def RDCNTVL   = BitPat("b0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0_00000_?????")
+  def RDCNTVH   = BitPat("b0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 1_00000_?????")
+  def BREAK     = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 0 0_???????????????")
+  def SYSCALL   = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 1 0_???????????????")
+  def ERTN      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 1 0_0 0 0 0 0_0 0 0 0 0")
+
   val table = Array(// (instrType, FuType, FuOpType, isrfWen)
-    SYSCALL     -> List(InstrCODE15, FuType.csr, CSROpType.jmp, false.B),
+    CSR     -> List(Instr2R, FuType.csr, La32rCSROpType.csracc, true.B),
+    RDCNTID -> List(Instr1RI20, FuType.csr, La32rCSROpType.rdcntid, true.B),
+    RDCNTVL -> List(Instr1RI20, FuType.csr, La32rCSROpType.rdcntvl, true.B),
+    RDCNTVH -> List(Instr1RI20, FuType.csr, La32rCSROpType.rdcntvh, true.B),
+    BREAK   -> List(InstrCODE15, FuType.csr, La32rCSROpType.break, false.B),
+    SYSCALL -> List(InstrCODE15, FuType.csr, La32rCSROpType.syscall, false.B),
+    ERTN    -> List(InstrCODE15, FuType.csr, La32rCSROpType.ertn, false.B),
   )
 }

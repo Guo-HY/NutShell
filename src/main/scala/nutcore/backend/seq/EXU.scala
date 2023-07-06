@@ -67,11 +67,14 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   mdu.io.out.ready := true.B
 
   // val csr = if (Settings.get("MmodeOnly")) Module(new CSR_M) else Module(new CSR)
-  val csr = Module(new CSR)
+  val csr = if (IsLa32r) Module(new La32rCSR()) else Module(new CSR)
   val csrOut = csr.access(valid = fuValids(FuType.csr), src1 = src1, src2 = src2, func = fuOpType)
   csr.io.cfIn := io.in.bits.cf
-  csr.io.cfIn.exceptionVec(loadAddrMisaligned) := lsu.io.loadAddrMisaligned
-  csr.io.cfIn.exceptionVec(storeAddrMisaligned) := lsu.io.storeAddrMisaligned
+  csr.io.la32rLSUExcp := lsu.io.la32rExcp
+  if (!IsLa32r) {
+    csr.io.cfIn.exceptionVec(loadAddrMisaligned) := lsu.io.loadAddrMisaligned
+    csr.io.cfIn.exceptionVec(storeAddrMisaligned) := lsu.io.storeAddrMisaligned
+  }
   csr.io.instrValid := io.in.valid && !io.flush
   csr.io.isBackendException := false.B
   io.out.bits.intrNO := csr.io.intrNO
@@ -89,7 +92,8 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   
   io.out.bits.decode := DontCare
   (io.out.bits.decode.ctrl, io.in.bits.ctrl) match { case (o, i) =>
-    o.rfWen := i.rfWen && (!lsuTlbPF && !lsu.io.loadAddrMisaligned && !lsu.io.storeAddrMisaligned || !fuValids(FuType.lsu)) && !(csr.io.wenFix && fuValids(FuType.csr))
+    // TODO : actually do not need loadAddrMisaligned and storeAddrMisaligned when la32r enable
+    o.rfWen := i.rfWen && (!lsuTlbPF && !lsu.io.loadAddrMisaligned && !lsu.io.storeAddrMisaligned && !lsu.io.la32rExcp.hasExcp || !fuValids(FuType.lsu)) && !(csr.io.wenFix && fuValids(FuType.csr)) // TODO : csr cond may has bug
     o.rfDest := i.rfDest
     o.fuType := i.fuType
   }
@@ -145,7 +149,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
     difftest.io.clock    := clock
     difftest.io.coreid   := 0.U // TODO: nutshell does not support coreid auto config
     difftest.io.valid    := nutcoretrap
-    difftest.io.code     := io.in.bits.data.src1
+    difftest.io.code     := 0.U
     difftest.io.pc       := io.in.bits.cf.pc
     difftest.io.cycleCnt := cycleCnt
     difftest.io.instrCnt := instrCnt

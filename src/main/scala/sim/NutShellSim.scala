@@ -72,4 +72,8 @@ class SimTop extends Module {
   io.uart <> mmio.io.uart
 
   io.timer := GTimer()
+
+  // TODO : support outer interrupt sim
+  soc.io.hwi := 0.U
+  soc.io.ipi := false.B
 }

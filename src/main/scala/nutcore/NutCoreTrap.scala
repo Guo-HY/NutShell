@@ -29,6 +29,11 @@ object NutCoreTrap extends HasInstrType {
   val table = Array(TRAP -> List(InstrI, FuType.csr, CSROpType.set))
 }
 
+object La32rNutCoreTrap extends HasInstrType {
+  def TRAP = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 1 0_000000000010001") // syscall 0x11
+
+}
+
 class Monitor extends BlackBox {
   val io = IO(new Bundle {
     val clk = Input(Clock())

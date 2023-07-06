@@ -33,6 +33,7 @@ class UnpipeLSUIO extends FunctionUnitIO {
   val storeAddrMisaligned = Output(Bool()) // TODO: refactor it for new backend
   val storeCheck = new StoreCheckIO
   val pc = Input(UInt(XLEN.W))
+  val la32rExcp = new La32rLSUExcpIO
 }
 
 abstract class AbstractUnpipelinedLSU(implicit val p: NutCoreConfig) extends NutCoreModule with HasLSUConst {
@@ -293,6 +294,7 @@ class UnpipelinedLSU(implicit override val p: NutCoreConfig) extends AbstractUnp
     io.storeAddrMisaligned := lsExecUnit.io.storeAddrMisaligned
 
     io.storeCheck := DontCare
+    io.la32rExcp := DontCare
 }
 
 class LSExecUnit extends NutCoreModule {
@@ -430,6 +432,7 @@ class LSExecUnit extends NutCoreModule {
   io.out.bits := Mux(partialLoad, rdataPartialLoad, rdata(XLEN-1,0))
 
   io.isMMIO := DontCare
+  io.la32rExcp := DontCare
 
   val isAMO = WireInit(false.B)
   BoringUtils.addSink(isAMO, "ISAMO2")

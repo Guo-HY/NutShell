@@ -179,3 +179,9 @@ class RenamedDecodeIO extends NutCoreBundle with HasBackendConst {
   val src2Rdy = Output(Bool())
   val brMask = Output(UInt(checkpointSize.W))
 }
+
+class La32rLSUExcpIO extends NutCoreBundle {
+  val hasExcp = Output(Bool())
+  val badv = Output(UInt(XLEN.W))
+  val ale = Output(Bool())
+}

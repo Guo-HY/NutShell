@@ -1,5 +1,477 @@
-package nutcore.backend.fu
+package nutcore
 
-class La32rCSR {
+import chisel3._
+import chisel3.util._
+import chisel3.util.experimental.BoringUtils
+import utils._
+import top.Settings
+import difftest._
 
+object La32rCSROpType {
+  def csracc = 1.U // general name for csrrd, csrwr, csrxchg
+  def csrrd = 2.U
+  def csrwr = 3.U // src2 is rd
+  def csrxchg = 4.U // src1 is rj, src2 is rd
+  def rdcntvl = 5.U
+  def rdcntvh = 6.U
+  def rdcntid = 7.U
+  def excption = 8.U // interrupt is equal to excption
+  def break = 9.U
+  def syscall = 10.U
+  def ertn = 11.U
+
+}
+
+
+trait HasLa32rCSRConst {
+  // CSR ADDR
+  val CRMDaddr      = 0x0
+  val PRMDaddr      = 0x1
+  val EUENaddr      = 0X2
+  val ECFGaddr      = 0x4
+  val ESTATaddr     = 0x5
+  val ERAaddr       = 0x6
+  val BADVaddr      = 0x7
+  val EENTRYaddr    = 0xc
+  val TLBIDXaddr    = 0x10
+  val TLBEHIaddr    = 0x11
+  val TLBELO0addr   = 0x12
+  val TLBELO1addr   = 0x13
+  val ASIDaddr      = 0x18
+  val PGDLaddr      = 0x19
+  val PGDHaddr      = 0x1A
+  val PGDaddr       = 0x1B
+  val CPUIDaddr     = 0x20
+  val SAVE0addr     = 0x30
+  val SAVE1addr     = 0x31
+  val SAVE2addr     = 0x32
+  val SAVE3addr     = 0X33
+  val TIDaddr       = 0x40
+  val TCFGaddr      = 0x41
+  val TVALaddr      = 0x42
+  val TICLRaddr     = 0x44
+  val LLBCTLaddr    = 0x60
+  val TLBRENTRYaddr = 0x88
+  val CTAGaddr      = 0x98
+  val DMW0addr      = 0x180
+  val DMW1addr      = 0x181
+
+  // CSR write mask for CSR instruction
+  val CRMDWmask     = "b11_11_1_1_1_11".U(32.W)
+  val PRMDWmask     = "b1_11".U(32.W)
+  val EUENWmask     = 0.U(32.W) // floating point instructions are not implemented, so FPE is always zero
+  val ECFGWmask     = "b11_0_1111111111".U(32.W)
+  val ESTATWmask    = "b11".U(32.W)
+  val EENTRYWmask   = 0xFFFFFFC0.S(32.W).asUInt
+  val CPUIDWmask    = 0.U(32.W)
+  val LLBCTLWmask   = "b110".U(32.W)
+  val TLBIDXWmask   = "b1_0_111111_00000000_1111111111111111".U(32.W).asUInt
+  val TLBEHIWmask   = 0xFFFFE000.S(32.W).asUInt
+  val TLBELO0Wmask  = 0xFFFFF7F.S(32.W).asUInt // we assume PALEN = 32
+  val TLBELO1Wmask  = 0xFFFFF7F.S(32.W).asUInt
+  val ASIDWmask     = 0x3FF.U(32.W)
+  val PGDLWmask     = 0xFFFFF000.S(32.W).asUInt
+  val PGDHWmask     = 0xFFFFF000.S(32.W).asUInt
+  val PGDWmask      = 0.U(32.W)
+  val TLBRENTRYWmask = 0xFFFFFFC0.S(32.W).asUInt
+  val DMW0Wmask     = "b111_0_111_0000000000000000000_11_1_00_1".U(32.W).asUInt
+  val DMW1Wmask     = "b111_0_111_0000000000000000000_11_1_00_1".U(32.W).asUInt
+  val TICLRWmask    = 1.U(32.W)
+
+  val timerWidth = 32
+}
+
+trait HasLa32rExceptionNO {
+  // do not change this encode because it represents priority
+  def INT = 0
+  // fetch
+  def ADEF = 1
+  def PIF = 2
+  // decode
+  def INE = 3
+  def IPE = 4
+  def FPD = 5
+  // execute
+  def ALE = 6
+  def SYS = 7
+  def BRK = 8
+  def TLBR = 9
+  def PIL = 10
+  def PIS = 11
+  def PPI = 12
+  def PME = 13
+  def FPE = 14
+
+//  val ExcPriority = Seq(
+//    INT,
+//    // fetch
+//    ADEF,
+//    PIF,
+//    // decode
+//    INE,
+//    IPE,
+//    FPD,
+//    // execute
+//    ALE,
+//    SYS,
+//    BRK,
+//    TLBR,
+//    PIL,
+//    PIS,
+//    PPI,
+//    PME,
+//    FPE
+//  )
+
+
+}
+
+class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst {
+  assert(XLEN == 32)
+
+  // csr struct define
+  class CRMDStruct extends Bundle {
+    val pad = Output(UInt(23.W))
+    val DATM = Output(UInt(2.W))
+    val DATF = Output(UInt(2.W))
+    val PG = Output(UInt(1.W))
+    val DA = Output(UInt(1.W))
+    val IE = Output(UInt(1.W))
+    val PLV = Output(UInt(2.W))
+  }
+
+  class PRMDStruct extends Bundle {
+    val pad = Output(UInt(29.W))
+    val PIE = Output(UInt(1.W))
+    val PPLV = Output(UInt(2.W))
+  }
+
+  class TCFGStruct extends Bundle {
+    val pad = if (timerWidth < 32) Output(UInt((32 - timerWidth).W)) else null
+    val InitVal = Output(UInt(timerWidth.W))
+    val Periodic = Output(UInt(1.W))
+    val En = Output(UInt(1.W))
+  }
+
+  class ESTATStruct extends Bundle {
+    val pad3 = Output(UInt(1.W))
+    val EsubCode = Output(UInt(9.W))
+    val Ecode = Output(UInt(6.W))
+    val pad2 = Output(UInt(3.W))
+    val IPI = Output(UInt(1.W))
+    val TI = Output(UInt(1.W))
+    val pad1 = Output(UInt(1.W))
+    val HWI = Output(UInt(8.W))
+    val SWI = Output(UInt(2.W))
+  }
+
+  class LLBCTLStruct extends Bundle {
+    val pad = Output(UInt(29.W))
+    val KLO = Output(UInt(1.W))
+    val WCLLB = Output(UInt(1.W))
+    val ROLLB = Output(UInt(1.W))
+  }
+
+  // reg define
+  val EUEN, ECFG, ERA, BADV, EENTRY, TLBIDX, TLBEHI, TLBELO0, TLBELO1, PGDL, PGDH, CPUID,
+  SAVE0, SAVE1, SAVE2, SAVE3, TID, TCFG, TVAL, TICLR, TLBRENTRY, CTAG, DMW0, DMW1 = RegInit(UInt(XLEN.W), 0.U)
+  val CRMD = RegInit(8.U.asTypeOf(new CRMDStruct)) // when reset, DA = 1
+  val PRMD = RegInit(0.U.asTypeOf(new PRMDStruct))
+  val ASID = RegInit(UInt(XLEN.W), 0xA0000.U) // we need set ASIDBITS=10, see spec 7.5.4
+  val ESTAT = RegInit(0.U.asTypeOf(new ESTATStruct))
+  val PGD = Mux(BADV(31), PGDH, PGDL) // see spec 7.5.7
+  val LLBCTL = RegInit(0.U.asTypeOf(new LLBCTLStruct))
+
+  // perfcnt
+  val hasPerfCnt = EnablePerfCnt && !p.FPGAPlatform
+  val nrPerfCnts = if (hasPerfCnt) 0x80 else 0x3
+  val perfCnts = List.fill(nrPerfCnts)(RegInit(0.U(64.W)))
+  val perfCntsLoMapping = (0 until nrPerfCnts).map { case i => MaskedRegMap(0xb00 + i, perfCnts(i)) }
+
+  val mapping = Map(
+    MaskedRegMap(CRMDaddr, CRMD.asUInt, MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(PRMDaddr, PRMD.asUInt, MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(EUENaddr, EUEN, EUENWmask),
+    MaskedRegMap(ECFGaddr, ECFG, ECFGWmask),
+    MaskedRegMap(ESTATaddr, ESTAT.asUInt, MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(ERAaddr, ERA),
+    MaskedRegMap(BADVaddr, BADV),
+    MaskedRegMap(EENTRYaddr, EENTRY, EENTRYWmask),
+    MaskedRegMap(TLBIDXaddr, TLBIDX, TLBIDXWmask),
+    MaskedRegMap(TLBEHIaddr, TLBEHI, TLBEHIWmask),
+    MaskedRegMap(TLBELO0addr, TLBELO0, TLBELO0Wmask),
+    MaskedRegMap(TLBELO1addr, TLBELO1, TLBELO1Wmask),
+    MaskedRegMap(ASIDaddr, ASID, ASIDWmask),
+    MaskedRegMap(PGDLaddr, PGDL, PGDLWmask),
+    MaskedRegMap(PGDHaddr, PGDH, PGDHWmask),
+    MaskedRegMap(PGDaddr, PGD, MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(CPUIDaddr, CPUID, CPUIDWmask),
+    MaskedRegMap(SAVE0addr, SAVE0),
+    MaskedRegMap(SAVE1addr, SAVE1),
+    MaskedRegMap(SAVE2addr, SAVE2),
+    MaskedRegMap(SAVE3addr, SAVE3),
+    MaskedRegMap(TIDaddr, TID),
+    MaskedRegMap(TCFGaddr, TCFG),
+    MaskedRegMap(TVALaddr, TVAL),
+    MaskedRegMap(TICLRaddr, TICLR, TICLRWmask, MaskedRegMap.NoSideEffect, MaskedRegMap.UnwritableMask),
+    MaskedRegMap(LLBCTLaddr, LLBCTL.asUInt, MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(TLBRENTRYaddr, TLBRENTRY, TLBRENTRYWmask),
+    MaskedRegMap(CTAGaddr, CTAG),
+    MaskedRegMap(DMW0addr, DMW0, DMW0Wmask),
+    MaskedRegMap(DMW1addr, DMW1, DMW1Wmask),
+  ) ++ perfCntsLoMapping
+
+  val tcfgStruct = TCFG.asTypeOf(new TCFGStruct)
+
+  // stable counter
+  val stableCounter = RegInit(UInt(64.W), 0.U)
+  stableCounter := stableCounter + 1.U
+
+  // handle csr access inst
+  val addr = io.cfIn.instr(23, 10)
+  val rdata = Wire(UInt(XLEN.W))
+  val wdata = Mux(func === La32rCSROpType.csrxchg, src1 & src2, src2)
+  val wen = valid && (func === La32rCSROpType.csrxchg || func === La32rCSROpType.csrwr) && !io.isBackendException
+  MaskedRegMap.generate(mapping, addr, rdata, wen, wdata)
+
+  io.out.bits := LookupTreeDefault(func, rdata, List(
+    La32rCSROpType.rdcntid -> TID,
+    La32rCSROpType.rdcntvl -> stableCounter(31, 0),
+    La32rCSROpType.rdcntvh -> stableCounter(63, 32)
+  ))
+
+  // fix csr reg software write
+  when(wen && addr === CRMDaddr.U) {
+    CRMD := (wdata & CRMDWmask).asTypeOf(CRMD)
+  }
+  when(wen && addr === PRMDaddr.U) {
+    PRMD := (wdata & PRMDWmask).asTypeOf(PRMD)
+  }
+  when(wen && addr === LLBCTLaddr.U) {
+    LLBCTL := (wdata & LLBCTLWmask).asTypeOf(LLBCTL)
+  }
+
+  // timer(TVAL)
+  val timerInterrupt = ESTAT.TI
+
+  when(tcfgStruct.En.asBool) {
+    when(TVAL === 0.U) {
+      timerInterrupt := true.B
+    }
+    when(TVAL =/= 0.U) {
+      TVAL := TVAL - 1.U
+    }
+    when(TVAL === 0.U && tcfgStruct.Periodic.asBool) {
+      TVAL := Cat(tcfgStruct.InitVal, 0.U(2.W))
+    }
+  }
+
+  when(wen && addr === TICLRaddr.U && wdata(0) === 1.U) {
+    timerInterrupt := false.B
+  }
+
+  // LLBit ctrl
+  when (wen && addr === LLBCTLaddr.U && wdata(1) === 1.U) {
+    LLBCTL.ROLLB := 0.U
+  }
+
+
+  // Exception & interrupt
+
+  // interrupts
+  val ipi = WireInit(false.B)
+  val hwi = WireInit(0.U(8.W))
+  BoringUtils.addSink(ipi, "ipi")
+  BoringUtils.addSink(hwi, "hwi")
+
+  when(wen && addr === ESTATaddr.U) {
+    ESTAT.SWI := wdata(1, 0)
+  }
+  ESTAT.HWI := hwi
+  ESTAT.IPI := ipi
+
+  val ESTATWire = WireInit(ESTAT.asUInt())
+  val intrVec = (ESTATWire(12, 0) & ECFG(12, 0)) & Fill(13, CRMD.IE)
+  BoringUtils.addSource(intrVec, "intrVecIDU")
+
+  // exceptions
+  val csrExceptionVec = Wire(Vec(16, Bool()))
+  csrExceptionVec.foreach(_ := false.B)
+  csrExceptionVec(SYS) := valid && func === La32rCSROpType.syscall
+  csrExceptionVec(BRK) := valid && func === La32rCSROpType.break
+  csrExceptionVec(ALE) := io.la32rLSUExcp.ale
+  // TODO : deal tlb exception
+  val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, valid)) | csrExceptionVec.asUInt
+  val raiseException = exceptionVec.orR
+  val excptionNO = PriorityEncoder(exceptionVec)
+  io.wenFix := raiseException // TODO : what is this
+  io.intrNO := excptionNO
+
+  val Ecode = LookupTree(excptionNO, List(
+    INT.asUInt -> 0x0.U,
+    PIL.asUInt -> 0x1.U,
+    PIS.asUInt -> 0x2.U,
+    PIF.asUInt -> 0x3.U,
+    PME.asUInt -> 0x4.U,
+    PPI.asUInt -> 0x7.U,
+    ADEF.asUInt -> 0x8.U,
+    ALE.asUInt -> 0x9.U,
+    SYS.asUInt -> 0xB.U,
+    BRK.asUInt -> 0xC.U,
+    INE.asUInt -> 0xD.U,
+    IPE.asUInt -> 0xE.U,
+    FPD.asUInt -> 0xF.U,
+    FPE.asUInt -> 0x12.U,
+    TLBR.asUInt -> 0x3F.U,
+  ))
+
+  when(raiseException) {
+    PRMD.PPLV := CRMD.PLV
+    PRMD.PIE := CRMD.IE
+    CRMD.PLV := 0.U
+    CRMD.IE := 0.U
+    ERA := io.cfIn.pc
+    ESTAT.Ecode := Ecode
+  }
+
+  when (raiseException && excptionNO === ADEF.U) {
+    BADV := io.cfIn.pc
+  }
+  when (raiseException && excptionNO === ALE.U) {
+    BADV := io.la32rLSUExcp.badv
+  }
+
+
+  // ertn
+  val retFromExcp = valid && func === La32rCSROpType.ertn
+  when (retFromExcp) {
+    CRMD.PLV := PRMD.PPLV
+    CRMD.IE := PRMD.PIE
+    when(ESTAT.Ecode === 0x3F.U) {
+      CRMD.DA := 0.U
+      CRMD.PG := 1.U
+    }
+    LLBCTL.KLO := 0.U
+    when (LLBCTL.KLO === 0.U) {
+      LLBCTL.ROLLB := 0.U // ROLLB is LLBit
+    }
+  }
+
+
+  io.redirect.valid := raiseException | retFromExcp
+  io.redirect.rtype := 0.U // TODO : what is this
+  io.redirect.target := Mux(retFromExcp, ERA, EENTRY)
+
+
+  io.in.ready := true.B
+  io.out.valid := valid
+
+  io.dmemMMU := DontCare
+  io.imemMMU := DontCare
+
+  // perfcnt
+  val generalPerfCntList = Map(
+    "Mcycle" -> (0xb00, "perfCntCondMcycle"),
+    "Minstret" -> (0xb02, "perfCntCondMinstret"),
+    "MultiCommit" -> (0xb03, "perfCntCondMultiCommit"),
+    "MimemStall" -> (0xb04, "perfCntCondMimemStall"),
+    "MaluInstr" -> (0xb05, "perfCntCondMaluInstr"),
+    "MbruInstr" -> (0xb06, "perfCntCondMbruInstr"),
+    "MlsuInstr" -> (0xb07, "perfCntCondMlsuInstr"),
+    "MmduInstr" -> (0xb08, "perfCntCondMmduInstr"),
+    "McsrInstr" -> (0xb09, "perfCntCondMcsrInstr"),
+    "MloadInstr" -> (0xb0a, "perfCntCondMloadInstr"),
+    "MmmioInstr" -> (0xb0b, "perfCntCondMmmioInstr"),
+    "MicacheHit" -> (0xb0c, "perfCntCondMicacheHit"),
+    "MdcacheHit" -> (0xb0d, "perfCntCondMdcacheHit"),
+    "MmulInstr" -> (0xb0e, "perfCntCondMmulInstr"),
+    "MifuFlush" -> (0xb0f, "perfCntCondMifuFlush"),
+    "MbpBRight" -> (0xb10, "MbpBRight"),
+    "MbpBWrong" -> (0xb11, "MbpBWrong"),
+    "MbpJRight" -> (0xb12, "MbpJRight"),
+    "MbpJWrong" -> (0xb13, "MbpJWrong"),
+    "MbpIRight" -> (0xb14, "MbpIRight"),
+    "MbpIWrong" -> (0xb15, "MbpIWrong"),
+    "MbpRRight" -> (0xb16, "MbpRRight"),
+    "MbpRWrong" -> (0xb17, "MbpRWrong"),
+    "Ml2cacheHit" -> (0xb18, "perfCntCondMl2cacheHit"),
+    "Custom1" -> (0xb19, "Custom1"),
+    "Custom2" -> (0xb1a, "Custom2"),
+    "Custom3" -> (0xb1b, "Custom3"),
+    "Custom4" -> (0xb1c, "Custom4"),
+    "Custom5" -> (0xb1d, "Custom5"),
+    "Custom6" -> (0xb1e, "Custom6"),
+    "Custom7" -> (0xb1f, "Custom7"),
+    "Custom8" -> (0xb20, "Custom8")
+  )
+
+  val sequentialPerfCntList = Map(
+    "MrawStall" -> (0xb31, "perfCntCondMrawStall"),
+    "MexuBusy" -> (0xb32, "perfCntCondMexuBusy"),
+    "MloadStall" -> (0xb33, "perfCntCondMloadStall"),
+    "MstoreStall" -> (0xb34, "perfCntCondMstoreStall"),
+    "ISUIssue" -> (0xb35, "perfCntCondISUIssue")
+  )
+  val perfCntList = generalPerfCntList ++ sequentialPerfCntList
+
+  val perfCntCond = List.fill(0x80)(WireInit(false.B))
+  (perfCnts zip perfCntCond).map { case (c, e) => {
+    when(e) {
+      c := c + 1.U
+    }
+  }
+  }
+
+  BoringUtils.addSource(WireInit(true.B), "perfCntCondMcycle")
+  perfCntList.foreach { case (name, (addr, boringId)) => {
+    BoringUtils.addSink(perfCntCond(addr & 0x7f), boringId)
+    if (!hasPerfCnt) {
+      // do not enable perfcnts except for Mcycle and Minstret
+      if (addr != perfCntList("Mcycle")._1 && addr != perfCntList("Minstret")._1) {
+        perfCntCond(addr & 0x7f) := false.B
+      }
+    }
+  }
+  }
+
+  val nutcoretrap = WireInit(false.B)
+  BoringUtils.addSink(nutcoretrap, "nutcoretrap")
+
+  def readWithScala(addr: Int): UInt = mapping(addr)._1
+
+  if (!p.FPGAPlatform) {
+    // to monitor
+    BoringUtils.addSource(readWithScala(perfCntList("Mcycle")._1), "simCycleCnt")
+    BoringUtils.addSource(readWithScala(perfCntList("Minstret")._1), "simInstrCnt")
+
+    if (hasPerfCnt) {
+      // display all perfcnt when nutcoretrap is executed
+      val PrintPerfCntToCSV = true
+      when(nutcoretrap) {
+        printf("======== PerfCnt =========\n")
+        perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
+          printf("%d <- " + name + "\n", readWithScala(addr))
+        }
+        if (PrintPerfCntToCSV) {
+          printf("======== PerfCntCSV =========\n\n")
+          perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
+            printf(name + ", ")
+          }
+          printf("\n\n\n")
+          perfCntList.toSeq.sortBy(_._2._1).map { case (name, (addr, boringId)) =>
+            printf("%d, ", readWithScala(addr))
+          }
+          printf("\n\n\n")
+        }
+      }
+    }
+  }
+
+  // dirty implement to pass firrtl compile
+  val mtip = WireInit(false.B)
+  val meip = WireInit(false.B)
+  val msip = WireInit(false.B)
+  BoringUtils.addSink(mtip, "mtip")
+  BoringUtils.addSink(meip, "meip")
+  BoringUtils.addSink(msip, "msip")
 }

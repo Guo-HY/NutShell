@@ -272,7 +272,12 @@ class BPU_embedded extends NutCoreModule {
   BoringUtils.addSink(flushBTB, "MOUFlushICache")
   BoringUtils.addSink(flushTLB, "MOUFlushTLB")
 
-  io.out.target := Mux(btbRead._type === BTBtype.R, rasTarget, btbRead.target)
+  val bpuOutRawTarget = Mux(btbRead._type === BTBtype.R, rasTarget, btbRead.target)
+  if (IsLa32r) {
+    io.out.target := Cat(bpuOutRawTarget(XLEN - 1, 2), 0.U(2.W))
+  } else {
+    io.out.target := bpuOutRawTarget
+  }
   io.out.valid := btbHit && Mux(btbRead._type === BTBtype.B, phtTaken, true.B)
   io.out.rtype := 0.U
 }
