@@ -465,6 +465,47 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
         }
       }
     }
+
+    val difftest = Module(new DifftestLa32rCSRState)
+    difftest.io.clock := clock
+    difftest.io.coreid := 0.U
+    difftest.io.crmd := RegNext(CRMD.asUInt)
+    difftest.io.prmd := RegNext(PRMD.asUInt)
+    difftest.io.euen := RegNext(EUEN)
+    difftest.io.ecfg := RegNext(ECFG)
+    difftest.io.estat := RegNext(ESTAT.asUInt())
+    difftest.io.era := RegNext(ERA)
+    difftest.io.badv := RegNext(BADV)
+    difftest.io.eentry := RegNext(EENTRY)
+    difftest.io.tlbidx := RegNext(TLBIDX)
+    difftest.io.tlbehi := RegNext(TLBEHI)
+    difftest.io.tlbelo0 := RegNext(TLBELO0)
+    difftest.io.tlbelo1 := RegNext(TLBELO1)
+    difftest.io.asid := RegNext(ASID)
+    difftest.io.pgdl := RegNext(PGDL)
+    difftest.io.pgdh := RegNext(PGDH)
+    difftest.io.pgd := RegNext(PGD)
+    difftest.io.cpuid := RegNext(CPUID)
+    difftest.io.save0 := RegNext(SAVE0)
+    difftest.io.save1 := RegNext(SAVE1)
+    difftest.io.save2 := RegNext(SAVE2)
+    difftest.io.save3 := RegNext(SAVE3)
+    difftest.io.tid := RegNext(TID)
+    difftest.io.tcfg := RegNext(TCFG)
+    difftest.io.tval := RegNext(TVAL)
+    difftest.io.ticlr := RegNext(TICLR)
+    difftest.io.llbctl := RegNext(LLBCTL.asUInt())
+    difftest.io.tlbrentry := RegNext(TLBRENTRY)
+    difftest.io.dmw0 := RegNext(DMW0)
+    difftest.io.dmw1 := RegNext(DMW1)
+
+    val diffTimerSync = Module(new DifftestLa32rTimerState)
+    diffTimerSync.io.clock := clock
+    diffTimerSync.io.coreid := 0.U
+    diffTimerSync.io.counter_id := RegNext(TID)
+    diffTimerSync.io.stable_counter_l := RegNext(stableCounter(31, 0))
+    diffTimerSync.io.stable_counter_h := RegNext(stableCounter(63, 32))
+    diffTimerSync.io.time_val := RegNext(TVAL)
   }
 
   // dirty implement to pass firrtl compile
