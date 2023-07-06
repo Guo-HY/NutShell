@@ -62,6 +62,16 @@ object LA32R_MDUInstr extends HasLa32rInstrType with HasNutCoreParameter {
   def MODW    = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1_?????_?????_?????")
   def DIVWU   = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 0_?????_?????_?????")
   def MODWU   = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 1_?????_?????_?????")
+
+  val table = Array( // (instrType, FuType, FuOpType, isrfWen)
+    MULW      -> List(Instr3R, FuType.mdu, MDUOpType.mul, true.B),
+    MULHW     -> List(Instr3R, FuType.mdu, MDUOpType.mulh, true.B),
+    MULHWU    -> List(Instr3R, FuType.mdu, MDUOpType.mulhu, true.B),
+    DIVW      -> List(Instr3R, FuType.mdu, MDUOpType.div, true.B),
+    DIVWU     -> List(Instr3R, FuType.mdu, MDUOpType.divu, true.B),
+    MODW      -> List(Instr3R, FuType.mdu, MDUOpType.rem, true.B),
+    MODWU     -> List(Instr3R, FuType.mdu, MDUOpType.remu, true.B),
+  )
 }
 
 object LA32R_BRUInstr extends HasLa32rInstrType with HasNutCoreParameter {
