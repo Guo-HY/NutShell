@@ -62,7 +62,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   val vaddr = holdSrc1 + holdSrc2
   val dmem = io.dmem
   val isStore = La32rLSUOpType.isStore(holdFunc)
-  val partialLoad = isStore && (holdFunc =/= La32rLSUOpType.lw)
+  val partialLoad = La32rLSUOpType.isLoad(holdFunc) && (holdFunc =/= La32rLSUOpType.lw)
 
   val s_idle :: s_wait_tlb :: s_wait_resp :: s_partialLoad :: Nil = Enum(4)
   val state = RegInit(s_idle)
