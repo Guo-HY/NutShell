@@ -19,6 +19,7 @@ object La32rCSROpType {
   def break = 9.U
   def syscall = 10.U
   def ertn = 11.U
+  def cacop = 12.U
 
 }
 
@@ -275,6 +276,9 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     LLBCTL.ROLLB := 0.U
   }
 
+  // cacop
+  val cacopCode = io.cfIn.instr(4, 0)
+
 
   // Exception & interrupt
 
@@ -300,6 +304,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(SYS) := valid && func === La32rCSROpType.syscall
   csrExceptionVec(BRK) := valid && func === La32rCSROpType.break
   csrExceptionVec(ALE) := io.la32rLSUExcp.ale
+  csrExceptionVec(IPE) := valid && !(func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U))
   // TODO : deal tlb exception
   val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, valid)) | csrExceptionVec.asUInt
   val raiseException = exceptionVec.orR
