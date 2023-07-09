@@ -257,8 +257,9 @@ class IFU_ooo extends NutCoreModule with HasResetVector {
 }
 
 class IFU_embedded extends NutCoreModule with HasResetVector {
+  assert(immuUserBits >= 68)
   val io = IO(new Bundle {
-    val imem = new SimpleBusUC(userBits = 64 + 4, addrBits = VAddrBits) // userBits need contain brIdx
+    val imem = new SimpleBusUC(userBits = immuUserBits, addrBits = VAddrBits) // userBits need contain brIdx
     val out = Decoupled(new CtrlFlowIO)
     val redirect = Flipped(new RedirectIO)
     val flushVec = Output(UInt(4.W))

@@ -36,7 +36,7 @@ case class CacheConfig (
   ways: Int = 4
 )
 
-sealed trait HasCacheConst {
+trait HasCacheConst {
   implicit val cacheConfig: CacheConfig
 
   val PAddrBits: Int
@@ -83,8 +83,8 @@ sealed trait HasCacheConst {
   def isSetConflict(a1: UInt, a2: UInt) = (a1.asTypeOf(addrBundle).index === a2.asTypeOf(addrBundle).index)
 }
 
-sealed abstract class CacheBundle(implicit cacheConfig: CacheConfig) extends Bundle with HasNutCoreParameter with HasCacheConst
-sealed abstract class CacheModule(implicit cacheConfig: CacheConfig) extends Module with HasNutCoreParameter with HasCacheConst with HasNutCoreLog
+abstract class CacheBundle(implicit cacheConfig: CacheConfig) extends Bundle with HasNutCoreParameter with HasCacheConst
+abstract class CacheModule(implicit cacheConfig: CacheConfig) extends Module with HasNutCoreParameter with HasCacheConst with HasNutCoreLog
 
 sealed class MetaBundle(implicit val cacheConfig: CacheConfig) extends CacheBundle {
   val tag = Output(UInt(TagBits.W))

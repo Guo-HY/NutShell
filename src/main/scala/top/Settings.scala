@@ -109,6 +109,8 @@ object La32rSettings {
     "ResetVector" -> 0x1c000000L,
     "EnableILA" -> false,
     "EnablePerfOutput" -> false,
+    "HasIMMU" -> true,
+    "HasDMMU" -> true,
   )
 }
 

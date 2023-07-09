@@ -80,6 +80,63 @@ trait HasLa32rCSRConst {
   val TICLRWmask    = 1.U(32.W)
 
   val timerWidth = 32
+
+  val CoherentCached = 0.U
+  val StronglyOrderedUncached = 1.U
+
+  // csr struct define
+  class CRMDStruct extends Bundle {
+    val pad = Output(UInt(23.W))
+    val DATM = Output(UInt(2.W))
+    val DATF = Output(UInt(2.W))
+    val PG = Output(UInt(1.W))
+    val DA = Output(UInt(1.W))
+    val IE = Output(UInt(1.W))
+    val PLV = Output(UInt(2.W))
+  }
+
+  class PRMDStruct extends Bundle {
+    val pad = Output(UInt(29.W))
+    val PIE = Output(UInt(1.W))
+    val PPLV = Output(UInt(2.W))
+  }
+
+  class TCFGStruct extends Bundle {
+    val pad = if (timerWidth < 32) Output(UInt((32 - timerWidth).W)) else null
+    val InitVal = Output(UInt(timerWidth.W))
+    val Periodic = Output(UInt(1.W))
+    val En = Output(UInt(1.W))
+  }
+
+  class ESTATStruct extends Bundle {
+    val pad3 = Output(UInt(1.W))
+    val EsubCode = Output(UInt(9.W))
+    val Ecode = Output(UInt(6.W))
+    val pad2 = Output(UInt(3.W))
+    val IPI = Output(UInt(1.W))
+    val TI = Output(UInt(1.W))
+    val pad1 = Output(UInt(1.W))
+    val HWI = Output(UInt(8.W))
+    val SWI = Output(UInt(2.W))
+  }
+
+  class LLBCTLStruct extends Bundle {
+    val pad = Output(UInt(29.W))
+    val KLO = Output(UInt(1.W))
+    val WCLLB = Output(UInt(1.W))
+    val ROLLB = Output(UInt(1.W))
+  }
+
+  class DMWStruct extends Bundle {
+    val VSEG = Output(UInt(3.W))
+    val pad0 = Output(UInt(1.W))
+    val PSEG = Output(UInt(3.W))
+    val pad1 = Output(UInt(19.W))
+    val MAT = Output(UInt(2.W))
+    val PLV3 = Output(UInt(1.W))
+    val pad2 = Output(UInt(2.W))
+    val PLV0 = Output(UInt(1.W))
+  }
 }
 
 trait HasLa32rExceptionNO {
@@ -129,49 +186,6 @@ trait HasLa32rExceptionNO {
 
 class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst {
   assert(XLEN == 32)
-
-  // csr struct define
-  class CRMDStruct extends Bundle {
-    val pad = Output(UInt(23.W))
-    val DATM = Output(UInt(2.W))
-    val DATF = Output(UInt(2.W))
-    val PG = Output(UInt(1.W))
-    val DA = Output(UInt(1.W))
-    val IE = Output(UInt(1.W))
-    val PLV = Output(UInt(2.W))
-  }
-
-  class PRMDStruct extends Bundle {
-    val pad = Output(UInt(29.W))
-    val PIE = Output(UInt(1.W))
-    val PPLV = Output(UInt(2.W))
-  }
-
-  class TCFGStruct extends Bundle {
-    val pad = if (timerWidth < 32) Output(UInt((32 - timerWidth).W)) else null
-    val InitVal = Output(UInt(timerWidth.W))
-    val Periodic = Output(UInt(1.W))
-    val En = Output(UInt(1.W))
-  }
-
-  class ESTATStruct extends Bundle {
-    val pad3 = Output(UInt(1.W))
-    val EsubCode = Output(UInt(9.W))
-    val Ecode = Output(UInt(6.W))
-    val pad2 = Output(UInt(3.W))
-    val IPI = Output(UInt(1.W))
-    val TI = Output(UInt(1.W))
-    val pad1 = Output(UInt(1.W))
-    val HWI = Output(UInt(8.W))
-    val SWI = Output(UInt(2.W))
-  }
-
-  class LLBCTLStruct extends Bundle {
-    val pad = Output(UInt(29.W))
-    val KLO = Output(UInt(1.W))
-    val WCLLB = Output(UInt(1.W))
-    val ROLLB = Output(UInt(1.W))
-  }
 
   // reg define
   val EUEN, ECFG, ERA, BADV, EENTRY, TLBIDX, TLBEHI, TLBELO0, TLBELO1, PGDL, PGDH, CPUID,
@@ -362,6 +376,11 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     }
   }
 
+
+  // mmu
+  BoringUtils.addSource(CRMD.asUInt(), "CRMD")
+  BoringUtils.addSource(DMW0.asUInt(), "DMW0")
+  BoringUtils.addSource(DMW1.asUInt(), "DMW1")
 
   io.redirect.valid := raiseException | retFromExcp
   io.redirect.rtype := 0.U // TODO : what is this

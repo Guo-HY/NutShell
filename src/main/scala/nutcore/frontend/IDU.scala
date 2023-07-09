@@ -354,7 +354,7 @@ class IDU(implicit val p: NutCoreConfig) extends NutCoreModule with HasInstrType
   //   printf("fire pc %x branch %x inst %x\n", runahead.io.pc, runahead.io.branch, io.out(0).bits.cf.instr)
   // }
 
-  if (!p.FPGAPlatform) {
+  if (!p.FPGAPlatform && !IsLa32r) {
     BoringUtils.addSource(decoder1.io.isWFI | decoder2.io.isWFI, "isWFI")
   }
 }

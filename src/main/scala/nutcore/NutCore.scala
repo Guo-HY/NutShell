@@ -36,6 +36,10 @@ trait HasNutCoreParameter {
   val HasDcache = Settings.get("HasDcache")
   val HasITLB = Settings.get("HasITLB")
   val HasDTLB = Settings.get("HasDTLB")
+  val HasIMMU = Settings.get("HasIMMU")
+  val HasDMMU = Settings.get("HasDMMU")
+  val immuUserBits = 64 + 4
+  val dmmuUserBits = 0
   val AddrBits = if (IsLa32r) 32 else 64 // AddrBits is used in some cases
   val VAddrBits = if (Settings.get("IsRV32") | IsLa32r) 32 else 39 // VAddrBits is Virtual Memory addr bits
   val PAddrBits = 32 // PAddrBits is Phyical Memory addr bits
