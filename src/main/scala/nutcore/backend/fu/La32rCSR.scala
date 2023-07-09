@@ -304,7 +304,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(SYS) := valid && func === La32rCSROpType.syscall
   csrExceptionVec(BRK) := valid && func === La32rCSROpType.break
   csrExceptionVec(ALE) := io.la32rLSUExcp.ale
-  csrExceptionVec(IPE) := valid && !(func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U))
+  csrExceptionVec(IPE) := valid && !(func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U)) && CRMD.PLV === 3.U
   // TODO : deal tlb exception
   val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, valid)) | csrExceptionVec.asUInt
   val raiseException = exceptionVec.orR
