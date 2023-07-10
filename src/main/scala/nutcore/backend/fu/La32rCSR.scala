@@ -382,9 +382,11 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   BoringUtils.addSource(DMW0.asUInt(), "DMW0")
   BoringUtils.addSource(DMW1.asUInt(), "DMW1")
 
-  io.redirect.valid := raiseException | retFromExcp
+  val hasSideEffectOp = valid && (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
+  
+  io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp
   io.redirect.rtype := 0.U // TODO : what is this
-  io.redirect.target := Mux(retFromExcp, ERA, EENTRY)
+  io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, EENTRY, io.cfIn.pc + 4.U))
 
 
   io.in.ready := true.B
