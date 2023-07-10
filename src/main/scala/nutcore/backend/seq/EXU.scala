@@ -30,7 +30,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
     val in = Flipped(Decoupled(new DecodeIO))
     val out = Decoupled(new CommitIO)
     val flush = Input(Bool())
-    val dmem = new SimpleBusUC(addrBits = VAddrBits)
+    val dmem = new SimpleBusUC(addrBits = VAddrBits, userBits = dmmuUserBits)
     val forward = new ForwardIO
     val memMMU = Flipped(new MemMMUIO)
   })
@@ -57,7 +57,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   lsu.io.wdata := src2
   lsu.io.instr := io.in.bits.cf.instr
   lsu.io.pc := io.in.bits.cf.pc
-  io.out.bits.isMMIO := lsu.io.isMMIO || (AddressSpace.isMMIO(io.in.bits.cf.pc) && io.out.valid)
+  io.out.bits.isMMIO := lsu.io.isMMIO
   io.dmem <> lsu.io.dmem
   io.out.bits.storeCheck := lsu.io.storeCheck
   lsu.io.out.ready := true.B

@@ -8,6 +8,7 @@ import bus.axi4._
 import chisel3.experimental.IO
 import utils._
 import top.Settings
+import sim.DeviceSpace
 
 trait HasLa32rCacheIO {
   implicit val cacheConfig: CacheConfig
@@ -27,9 +28,6 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
 
   val ismmio = io.mat === StronglyOrderedUncached
   val ismmioRec = RegEnable(ismmio, io.in.req.fire())
-  if (cacheConfig.name == "dcache") {
-    BoringUtils.addSource(ismmio, "lsuMMIO")
-  }
 
   val needFlush = RegInit(false.B)
   when (io.flush(0) && (state =/= s_idle)) { needFlush := true.B }
@@ -76,7 +74,8 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
   io.in.resp.bits.rdata := Mux(ismmioRec, mmiordata, memrdata)
   io.in.resp.bits.cmd := Mux(ismmioRec, mmiocmd, memcmd)
 
-  val memuser = RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
+  val isReadDevice = cmd === SimpleBusCmd.read && DeviceSpace.isDevice(reqaddr)
+  val memuser = if (name == "dcache") isReadDevice else RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
   io.in.resp.bits.user.zip(if (userBits > 0) Some(memuser) else None).map { case (o,i) => o := i }
 
   io.out.mem.req.bits.apply(addr = reqaddr,

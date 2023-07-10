@@ -6,6 +6,7 @@ import chisel3.util.experimental.BoringUtils
 import utils._
 import bus.simplebus._
 import difftest.DifftestStoreEvent
+import sim.DeviceSpace
 import top.Settings
 
 object La32rLSUOpType {
@@ -96,7 +97,8 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     size = size,
     wdata = genWdata(holdWdata, size),
     wmask = genWmask(vaddr, size),
-    cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read))
+    cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read),
+    user = !isStore)
   dmem.req.valid := valid && (state === s_idle) && !io.la32rExcp.hasExcp
   dmem.resp.ready := partialLoad || io.out.ready
 
@@ -133,21 +135,22 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   io.la32rExcp.ale := valid && !addrAligned
   io.la32rExcp.badv := vaddr
 
+  val isReadDevice = HoldReleaseLatch(valid=dmem.resp.valid && dmem.resp.bits.user.getOrElse(0.U).orR, release=io.out.fire, flush=false.B)
+  LADebug(isReadDevice, "isReadDevice\n")
+  io.isMMIO := isReadDevice
+
   Debug(io.la32rExcp.ale, "misaligned addr detected\n")
 
-  LADebug(dmem.req.fire, "[LSUREQ]pc=0x%x instr=0x%x vaddr=0x%x size=%d wdata=0x%x wmask=0x%x cmd=%d",
+  LADebug(dmem.req.fire, "[LSUREQ]pc=0x%x instr=0x%x vaddr=0x%x size=%d wdata=0x%x wmask=0x%x cmd=%d\n",
     io.pc, io.instr, vaddr, size, dmem.req.bits.wdata, dmem.req.bits.wmask, dmem.req.bits.cmd)
 
-  LADebug(io.out.fire, "[LSURESP]pc=0x%x instr=0x%x rdata=0x%x", io.pc, io.instr, io.out.bits)
+  LADebug(io.out.fire, "[LSURESP]pc=0x%x instr=0x%x rdata=0x%x\n", io.pc, io.instr, io.out.bits)
 
   // below is temp code to pass firrtl compile
-  val lsuMMIO = WireInit(false.B)
-  BoringUtils.addSink(lsuMMIO, "lsuMMIO")
   val lr = WireInit(Bool(), false.B)
   BoringUtils.addSink(lr, "lr")
   val lrAddr = WireInit(UInt(AddrBits.W), DontCare)
   BoringUtils.addSink(lrAddr, "lr_addr")
-  io.isMMIO := DontCare
   io.loadAddrMisaligned := DontCare
   io.storeAddrMisaligned := DontCare
 

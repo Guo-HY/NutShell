@@ -10,7 +10,7 @@ import top.Settings
 
 class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle() {
-    val mem = new SimpleBusUC()
+    val mem = new SimpleBusUC(addrBits = PAddrBits)
   })
 
   val frontend = Module(new Frontend_embedded)
@@ -27,7 +27,7 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits))
 
-  val dcache = La32rCache(in = dmmu.io.out, mmio = memXbar.io.in(0), flush = "b00".U, mat = dmmu.io.memoryAccessType, enable = HasDcache)(CacheConfig(ro = false, name = "dcache"))
+  val dcache = La32rCache(in = dmmu.io.out, mmio = memXbar.io.in(0), flush = "b00".U, mat = dmmu.io.memoryAccessType, enable = HasDcache)(CacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits))
 
   memXbar.io.in(1) <> dcache.io.out.mem
   memXbar.io.in(3) <> icache.io.out.mem

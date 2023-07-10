@@ -72,14 +72,14 @@ class SimpleBusCrossbar1toN(addressSpace: List[(Long, Long)]) extends Module {
   io.in.resp.bits := Mux1H(outSelRespVec, io.out.map(_.resp.bits))
   // io.in.resp.bits.exc.get := state === s_error
 
-  Debug() {
-    when (io.in.req.fire()) {
-      printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.req: ${io.in.req.bits}\n")
-    }
-    when (io.in.resp.fire()) {
-      printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.resp: ${io.in.resp.bits}\n")
-    }
-  }
+//  Debug() {
+//    when (io.in.req.fire()) {
+//      printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.req: ${io.in.req.bits}\n")
+//    }
+//    when (io.in.resp.fire()) {
+//      printf(p"${GTimer()}: xbar: outSelVec = ${outSelVec}, outSel.resp: ${io.in.resp.bits}\n")
+//    }
+//  }
 }
 
 class SimpleBusCrossbarNto1(n: Int, userBits:Int = 0) extends Module {

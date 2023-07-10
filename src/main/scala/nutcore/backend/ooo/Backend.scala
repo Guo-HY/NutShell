@@ -671,7 +671,7 @@ class Backend_inorder(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle {
     val in = Vec(2, Flipped(Decoupled(new DecodeIO)))
     val flush = Input(UInt(2.W))
-    val dmem = new SimpleBusUC(addrBits = VAddrBits)
+    val dmem = new SimpleBusUC(addrBits = VAddrBits, userBits = dmmuUserBits)
     val memMMU = Flipped(new MemMMUIO)
 
     val redirect = new RedirectIO

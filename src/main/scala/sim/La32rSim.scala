@@ -11,7 +11,21 @@ import nutcore._
 import _root_.utils.GTimer
 import bus.simplebus.SimpleBusCrossbar1toN
 import difftest._
+import nutcore.AddressSpace.PAddrBits
 import top.Settings
+
+object DeviceSpace extends HasNutCoreParameter {
+  // (start, size)
+  def device = List(
+    (Settings.getLong("MMIOBase"), Settings.getLong("MMIOSize")) // external devices
+  )
+
+  def isDevice(addr: UInt) = device.map(range => {
+    require(isPow2(range._2))
+    val bits = log2Up(range._2)
+    (addr ^ range._1.U)(PAddrBits-1, bits) === 0.U
+  }).reduce(_ || _)
+}
 
 class SimTop extends Module {
   val io = IO(new Bundle{
