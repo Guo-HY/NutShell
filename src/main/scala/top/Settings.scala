@@ -111,6 +111,9 @@ object La32rSettings {
     "EnablePerfOutput" -> false,
     "HasIMMU" -> true,
     "HasDMMU" -> true,
+    "ConfregBase1" -> 0xbfaf0000L, // see chiplab/IP/BRIDGE/bridge_1x2.v : line 48/49 and line 107/108
+    "ConfregBase2" -> 0x1faf0000L, // TODO : la32r-linux seems to use different device address
+    "ConfregSize" -> 0x10000L,
   )
 }
 
