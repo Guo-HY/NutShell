@@ -27,7 +27,7 @@ object RegMap {
   def generate(mapping: Map[Int, (UInt, UInt => UInt)], raddr: UInt, rdata: UInt,
     waddr: UInt, wen: Bool, wdata: UInt, wmask: UInt):Unit = {
     val chiselMapping = mapping.map { case (a, (r, w)) => (a.U, r, w) }
-    rdata := LookupTree(raddr, chiselMapping.map { case (a, r, w) => (a, r) })
+    rdata := LookupTreeDefault(raddr, 0.U, chiselMapping.map { case (a, r, w) => (a, r) })
     chiselMapping.map { case (a, r, w) =>
       if (w != null) when (wen && waddr === a) { r := w(MaskData(r, wdata, wmask)) }
     }
