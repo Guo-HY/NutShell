@@ -78,7 +78,7 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
     tlb.io.in.bits.memAccessMaster := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle).memAccessMaster
   }
 
-  val tlbExcp = tlb.io.out.bits.excp
+  val tlbExcp = (tlb.io.out.bits.excp.asUInt() & Fill(tlb.io.out.bits.excp.asUInt().getWidth, isTLB)).asTypeOf(tlb.io.out.bits.excp)
   val TLBPaddr = tlb.io.out.bits.paddr
   val TLBMAT = tlb.io.out.bits.mat
 
