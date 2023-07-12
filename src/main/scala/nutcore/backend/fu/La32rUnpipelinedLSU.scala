@@ -35,7 +35,7 @@ object La32rLSUOpType {
 
 // for load & store operation , vaddr = src1 + SignExt(src2(11, 0), 32)
 // for store operation, use wdata as store data
-class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends AbstractUnpipelinedLSU {
+class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends AbstractUnpipelinedLSU with HasMemAccessMaster {
 
   def genWmask(addr: UInt, sizeEncode: UInt): UInt = {
     LookupTree(sizeEncode, List(
@@ -92,13 +92,18 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
 
   val size = holdFunc(1, 0)
 
+  val reqUserBits = Wire(new DmmuUserBundle)
+  reqUserBits.isDeviceLoad := !isStore
+  reqUserBits.memAccessMaster := Mux(isStore, STORE, LOAD)
+  reqUserBits.tlbExcp := 0.U.asTypeOf(reqUserBits.tlbExcp)
+
   dmem.req.bits.apply(
     addr = vaddr,
     size = size,
     wdata = genWdata(holdWdata, size),
     wmask = genWmask(vaddr, size),
     cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read),
-    user = !isStore)
+    user = reqUserBits.asUInt())
   dmem.req.valid := valid && (state === s_idle) && !io.la32rExcp.hasExcp
   dmem.resp.ready := partialLoad || io.out.ready
 
@@ -131,12 +136,16 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     "b10".U -> (vaddr(1, 0) === 0.U)
   ))
 
-  io.la32rExcp.hasExcp := io.la32rExcp.ale
+  val respUserBits = dmem.resp.bits.user.get.asTypeOf(new DmmuUserBundle)
+
+  io.la32rExcp.hasExcp := io.la32rExcp.ale | respUserBits.tlbExcp.asUInt().orR
   io.la32rExcp.ale := valid && !addrAligned
   io.la32rExcp.badv := vaddr
+  io.la32rExcp.tlbExcp := respUserBits.tlbExcp
 
-  val isReadDevice = HoldReleaseLatch(valid=dmem.resp.valid && dmem.resp.bits.user.getOrElse(0.U).orR, release=io.out.fire, flush=false.B)
-  LADebug(isReadDevice, "isReadDevice\n")
+
+  val isReadDevice = HoldReleaseLatch(valid=dmem.resp.valid && respUserBits.isDeviceLoad.asBool(), release=io.out.fire, flush=false.B)
+
   io.isMMIO := isReadDevice
 
   Debug(io.la32rExcp.ale, "misaligned addr detected\n")

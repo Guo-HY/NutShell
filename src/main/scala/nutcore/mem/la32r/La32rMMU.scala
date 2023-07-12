@@ -6,18 +6,23 @@ import chisel3.util.experimental.BoringUtils
 import bus.simplebus._
 import bus.axi4._
 import chisel3.experimental.IO
+import sim.DeviceSpace
 import utils._
 import top.Settings
 
-sealed case class La32rMMUConfig (
+case class La32rMMUConfig (
   name: String = "mmu",
   userBits: Int = 0,
+  tlbEntryNum: Int = 32,
 )
 
 trait HasLa32rMMUConst {
   implicit val la32rMMUConfig: La32rMMUConfig
 
   val userBits = la32rMMUConfig.userBits
+  val mmuname = la32rMMUConfig.name
+  val tlbEntryNum = la32rMMUConfig.tlbEntryNum
+
 }
 
 trait HasLa32rMMUIO extends HasNutCoreParameter with HasLa32rMMUConst {
@@ -31,7 +36,8 @@ trait HasLa32rMMUIO extends HasNutCoreParameter with HasLa32rMMUConst {
 
 
 class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModule with HasLa32rMMUIO with HasLa32rCSRConst {
-  val isIMMU = name == "immu" // otherwise is dmmu
+  assert(mmuname == "immu" || mmuname == "dmmu" || mmuname == "csr")
+  val isIMMU = mmuname == "immu" // otherwise is dmmu
 
   val CRMD = WireInit(0.U(32.W))
   val DMW0 = WireInit(0.U(32.W))
@@ -59,11 +65,40 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
   val DMATPaddr = Mux(DMWHitVec(0), Cat(DMWVec(0).PSEG, io.in.req.bits.addr(28, 0))(PAddrBits - 1, 0),Cat(DMWVec(1).PSEG, io.in.req.bits.addr(28, 0))(PAddrBits - 1, 0))
   val DMATMAT = Mux(DMWHitVec(0), DMWVec(0).MAT, DMWVec(1).MAT)
 
-  val isTLB = !isDAT && !isDMAT
-  assert(isDAT || isDMAT) // TODO : add tlb support
 
-  io.out.req.bits.addr := Mux(isDAT, DATPaddr, DMATPaddr)
-  io.memoryAccessType := Mux(isDAT, DATMAT, DMATMAT)
+  val isTLB = !isDAT && !isDMAT
+
+  val tlb = Module(new La32rTLB)
+
+  tlb.io.in.valid := io.in.req.valid
+  tlb.io.in.bits.vaddr := io.in.req.bits.addr
+  if (mmuname == "immu") {
+    tlb.io.in.bits.memAccessMaster := io.in.req.bits.user.get.asTypeOf(new ImmuUserBundle).memAccessMaster
+  } else {
+    tlb.io.in.bits.memAccessMaster := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle).memAccessMaster
+  }
+
+  val tlbExcp = tlb.io.out.bits.excp
+  val TLBPaddr = tlb.io.out.bits.paddr
+  val TLBMAT = tlb.io.out.bits.mat
+
+
+  io.out.req.bits.addr := Mux(isDAT, DATPaddr,Mux(isDMAT, DMATPaddr, TLBPaddr))
+  io.memoryAccessType := Mux(isDAT, DATMAT,Mux(isDMAT, DMATMAT, TLBMAT))
+
+  if (mmuname == "immu") {
+    val immuUserBits = Wire(new ImmuUserBundle)
+    immuUserBits := io.in.req.bits.user.get.asTypeOf(new ImmuUserBundle)
+    immuUserBits.tlbExcp := tlbExcp
+    io.out.req.bits.user.map(_ := immuUserBits.asUInt())
+  } else {
+    val dmmuUserBits = Wire(new DmmuUserBundle)
+    dmmuUserBits := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle)
+    dmmuUserBits.tlbExcp := tlbExcp
+    dmmuUserBits.isDeviceLoad := io.in.req.bits.cmd === SimpleBusCmd.read && DeviceSpace.isDevice(io.out.req.bits.addr)
+    io.out.req.bits.user.map(_ := dmmuUserBits.asUInt())
+  }
+
 
 }
 
@@ -71,10 +106,12 @@ class La32rMMU_fake(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCore
   val CRMD = WireInit(0.U(32.W))
   val DMW0 = WireInit(0.U(32.W))
   val DMW1 = WireInit(0.U(32.W))
+  val ASID = WireInit(0.U(32.W))
 
   BoringUtils.addSink(CRMD, "CRMD")
   BoringUtils.addSink(DMW0, "DMW0")
   BoringUtils.addSink(DMW1, "DMW1")
+  BoringUtils.addSink(ASID, "ASID")
 
   io.out <> io.in
   io.memoryAccessType := 0.U

@@ -38,8 +38,21 @@ trait HasNutCoreParameter {
   val HasDTLB = Settings.get("HasDTLB")
   val HasIMMU = Settings.get("HasIMMU")
   val HasDMMU = Settings.get("HasDMMU")
-  val immuUserBits = 64 + 4 // pc, npc, brIdx
-  val dmmuUserBits = 1 // is device Load
+
+  class ImmuUserBundle extends Bundle {
+    val pc = Output(UInt(XLEN.W))
+    val npc = Output(UInt(XLEN.W))
+    val brIdx =  Output(UInt(4.W))
+    val memAccessMaster = Output(UInt(2.W))
+    val tlbExcp = new La32rTLBExcpIO
+  }
+  class DmmuUserBundle extends Bundle {
+    val isDeviceLoad = Output(UInt(1.W))
+    val memAccessMaster = Output(UInt(2.W))
+    val tlbExcp = new La32rTLBExcpIO
+  }
+  val immuUserBits = (new ImmuUserBundle).getWidth
+  val dmmuUserBits = (new DmmuUserBundle).getWidth
   val AddrBits = if (IsLa32r) 32 else 64 // AddrBits is used in some cases
   val VAddrBits = if (Settings.get("IsRV32") | IsLa32r) 32 else 39 // VAddrBits is Virtual Memory addr bits
   val PAddrBits = 32 // PAddrBits is Phyical Memory addr bits

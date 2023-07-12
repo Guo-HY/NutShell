@@ -20,6 +20,11 @@ object La32rCSROpType {
   def syscall = 10.U
   def ertn = 11.U
   def cacop = 12.U
+  def tlbsrch = 13.U
+  def tlbrd = 14.U
+  def tlbwr = 15.U
+  def tlbfill = 16.U
+  def invtlb = 17.U // src1 = rj ,src2 = rk
 
 }
 
@@ -137,6 +142,39 @@ trait HasLa32rCSRConst {
     val pad2 = Output(UInt(2.W))
     val PLV0 = Output(UInt(1.W))
   }
+
+  class ASIDStruct extends Bundle {
+    val pad0 = Output(UInt(8.W))
+    val ASIDBITS = Output(UInt(8.W))
+    val pad1 = Output(UInt(6.W))
+    val ASID = Output(UInt(10.W))
+  }
+
+  class TLBEHIStruct extends Bundle {
+    val VPPN = Output(UInt(19.W))
+    val pad = Output(UInt(13.W))
+  }
+
+  class TLBELOStruct extends Bundle {
+    val pad0 = Output(UInt(4.W))
+    val PPN = Output(UInt(20.W))
+    val pad1 = Output(UInt(1.W))
+    val G = Output(UInt(1.W))
+    val MAT = Output(UInt(2.W))
+    val PLV = Output(UInt(2.W))
+    val D = Output(UInt(1.W))
+    val V = Output(UInt(1.W))
+  }
+
+  class TLBIDXStruct extends Bundle {
+    val NE = Output(UInt(1.W))
+    val pad0 = Output(UInt(1.W))
+    val PS = Output(UInt(6.W))
+    val pad1 = Output(UInt(8.W))
+    val pad2 = Output(UInt((16 - log2Up(Settings.getInt("TlbEntryNum"))).W))
+    val index = Output(UInt(log2Up(Settings.getInt("TlbEntryNum")).W))
+  }
+
 }
 
 trait HasLa32rExceptionNO {
@@ -184,18 +222,22 @@ trait HasLa32rExceptionNO {
 
 }
 
-class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst {
+class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst with HasLa32rTLBConst {
   assert(XLEN == 32)
 
   // reg define
-  val EUEN, ECFG, ERA, BADV, EENTRY, TLBIDX, TLBEHI, TLBELO0, TLBELO1, PGDL, PGDH, CPUID,
+  val EUEN, ECFG, ERA, BADV, EENTRY, PGDL, PGDH, CPUID,
   SAVE0, SAVE1, SAVE2, SAVE3, TID, TCFG, TVAL, TICLR, TLBRENTRY, CTAG, DMW0, DMW1 = RegInit(UInt(XLEN.W), 0.U)
   val CRMD = RegInit(8.U.asTypeOf(new CRMDStruct)) // when reset, DA = 1
   val PRMD = RegInit(0.U.asTypeOf(new PRMDStruct))
-  val ASID = RegInit(UInt(XLEN.W), 0xA0000.U) // we need set ASIDBITS=10, see spec 7.5.4
+  val ASID = RegInit(0xA0000.U.asTypeOf(new ASIDStruct)) // we need set ASIDBITS=10, see spec 7.5.4
   val ESTAT = RegInit(0.U.asTypeOf(new ESTATStruct))
   val PGD = Mux(BADV(31), PGDH, PGDL) // see spec 7.5.7
   val LLBCTL = RegInit(0.U.asTypeOf(new LLBCTLStruct))
+  val TLBIDX = RegInit(0.U.asTypeOf(new TLBIDXStruct))
+  val TLBEHI = RegInit(0.U.asTypeOf(new TLBEHIStruct))
+  val TLBELO0 = RegInit(0.U.asTypeOf(new TLBELOStruct))
+  val TLBELO1 = RegInit(0.U.asTypeOf(new TLBELOStruct))
 
   // perfcnt
   val hasPerfCnt = EnablePerfCnt && !p.FPGAPlatform
@@ -212,11 +254,11 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     MaskedRegMap(ERAaddr, ERA),
     MaskedRegMap(BADVaddr, BADV),
     MaskedRegMap(EENTRYaddr, EENTRY, EENTRYWmask),
-    MaskedRegMap(TLBIDXaddr, TLBIDX, TLBIDXWmask),
-    MaskedRegMap(TLBEHIaddr, TLBEHI, TLBEHIWmask),
-    MaskedRegMap(TLBELO0addr, TLBELO0, TLBELO0Wmask),
-    MaskedRegMap(TLBELO1addr, TLBELO1, TLBELO1Wmask),
-    MaskedRegMap(ASIDaddr, ASID, ASIDWmask),
+    MaskedRegMap(TLBIDXaddr, TLBIDX.asUInt(), MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(TLBEHIaddr, TLBEHI.asUInt(), MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(TLBELO0addr, TLBELO0.asUInt(), MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(TLBELO1addr, TLBELO1.asUInt(), MaskedRegMap.UnwritableMask, null),
+    MaskedRegMap(ASIDaddr, ASID.asUInt(), MaskedRegMap.UnwritableMask, null),
     MaskedRegMap(PGDLaddr, PGDL, PGDLWmask),
     MaskedRegMap(PGDHaddr, PGDH, PGDHWmask),
     MaskedRegMap(PGDaddr, PGD, MaskedRegMap.UnwritableMask, null),
@@ -264,6 +306,21 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   }
   when(wen && addr === LLBCTLaddr.U) {
     LLBCTL := (wdata & LLBCTLWmask).asTypeOf(LLBCTL)
+  }
+  when(wen && addr === TLBIDXaddr.U) {
+    TLBIDX := (wdata & TLBIDXWmask).asTypeOf(TLBIDX)
+  }
+  when(wen && addr === TLBEHIaddr.U) {
+    TLBEHI := (wdata & TLBEHIWmask).asTypeOf(TLBEHI)
+  }
+  when(wen && addr === TLBELO0addr.U) {
+    TLBELO0 := (wdata & TLBELO0Wmask).asTypeOf(TLBELO0)
+  }
+  when(wen && addr === TLBELO1addr.U) {
+    TLBELO1 := (wdata & TLBELO1Wmask).asTypeOf(TLBELO1)
+  }
+  when(wen && addr === ASIDaddr.U) {
+    ASID := (wdata & ASIDWmask).asTypeOf(ASID)
   }
 
   // timer(TVAL)
@@ -319,7 +376,13 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(BRK) := valid && func === La32rCSROpType.break
   csrExceptionVec(ALE) := io.la32rLSUExcp.ale
   csrExceptionVec(IPE) := valid && !(func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U)) && CRMD.PLV === 3.U
-  // TODO : deal tlb exception
+  csrExceptionVec(TLBR) := io.la32rLSUExcp.tlbExcp.tlbRefillExcp
+  csrExceptionVec(PIL) := io.la32rLSUExcp.tlbExcp.loadPageInvalidExcp
+  csrExceptionVec(PIS) := io.la32rLSUExcp.tlbExcp.storePageInvalidExcp
+  csrExceptionVec(PPI) := io.la32rLSUExcp.tlbExcp.pagePrivInvalidExcp
+  csrExceptionVec(PME) := io.la32rLSUExcp.tlbExcp.pageModifyExcp
+  csrExceptionVec(INE) := valid && func === La32rCSROpType.invtlb && io.cfIn.instr(4, 0) > 6.U
+
   val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, valid)) | csrExceptionVec.asUInt
   val raiseException = exceptionVec.orR
   val excptionNO = PriorityEncoder(exceptionVec)
@@ -344,6 +407,8 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     TLBR.asUInt -> 0x3F.U,
   ))
 
+  val badvWrite = WireInit(0.U(32.W))
+
   when(raiseException) {
     PRMD.PPLV := CRMD.PLV
     PRMD.PIE := CRMD.IE
@@ -351,13 +416,26 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     CRMD.IE := 0.U
     ERA := io.cfIn.pc
     ESTAT.Ecode := Ecode
-  }
 
-  when (raiseException && excptionNO === ADEF.U) {
-    BADV := io.cfIn.pc
-  }
-  when (raiseException && excptionNO === ALE.U) {
-    BADV := io.la32rLSUExcp.badv
+    when (excptionNO === TLBR.U) {
+      CRMD.DA := 1.U
+      CRMD.PG := 0.U
+    }
+
+    when ((excptionNO === ADEF.U) || (excptionNO === TLBR.U && io.cfIn.exceptionVec(TLBR)) ||
+      (excptionNO === PIF.U) || (excptionNO === PPI.U && io.cfIn.exceptionVec(PPI))) {
+      BADV := io.cfIn.pc
+      badvWrite := io.cfIn.pc
+    }.elsewhen((excptionNO === TLBR.U) || (excptionNO === ALE.U) || (excptionNO === PIL.U) || (excptionNO === PIS.U)
+      || (excptionNO === PME.U) || (excptionNO === PPI.U)) {
+      BADV := io.la32rLSUExcp.badv
+      badvWrite := io.la32rLSUExcp.badv
+    }
+
+    when((excptionNO === TLBR.U) || (excptionNO === PIL.U) || (excptionNO === PIS.U) || (excptionNO === PIF.U) ||
+      (excptionNO === PME.U) || (excptionNO === PPI.U)) {
+      TLBEHI := Cat(badvWrite(31, 13), 0.U(13.W)).asTypeOf(TLBEHI)
+    }
   }
 
 
@@ -376,17 +454,86 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     }
   }
 
+  val exceptionEntry = Mux(excptionNO === TLBR.U, TLBRENTRY, EENTRY)
 
   // mmu
   BoringUtils.addSource(CRMD.asUInt(), "CRMD")
   BoringUtils.addSource(DMW0.asUInt(), "DMW0")
   BoringUtils.addSource(DMW1.asUInt(), "DMW1")
+  BoringUtils.addSource(ASID.asUInt(), "ASID")
 
+  // tlb
+  val tlbModifyValid = WireInit(false.B)
+  val tlbModifyOp = WireInit(0.U(7.W))
+  val invtlbOp = io.cfIn.instr(4, 0)
+  val invtlbasid = src1(9, 0)
+  val invtlbvaddr = src2
+  BoringUtils.addSource(tlbModifyValid, "tlbModifyValid")
+  BoringUtils.addSource(tlbModifyOp, "tlbModifyOp")
+  BoringUtils.addSource(invtlbOp, "invtlbOp")
+  BoringUtils.addSource(invtlbasid, "invtlbasid")
+  BoringUtils.addSource(invtlbvaddr, "invtlbvaddr")
+  BoringUtils.addSource(TLBEHI.asUInt(), "TLBEHI")
+  BoringUtils.addSource(TLBELO0.asUInt(), "TLBELO0")
+  BoringUtils.addSource(TLBELO1.asUInt(), "TLBELO1")
+  BoringUtils.addSource(TLBIDX.asUInt(), "TLBIDX")
+  BoringUtils.addSource(ESTAT.asUInt(), "ESTAT")
+
+  tlbModifyValid := valid && func === La32rCSROpType.tlbwr || func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb
+  tlbModifyOp := func
+
+  val csrtlb = La32rTLB()(La32rMMUConfig(name = "csr", tlbEntryNum = Settings.getInt("TlbEntryNum")))
+  csrtlb.io.in.valid := valid && (func === La32rCSROpType.tlbsrch || func === La32rCSROpType.tlbrd)
+  csrtlb.io.in.bits.vaddr := TLBEHI.asUInt()
+  csrtlb.io.in.bits.memAccessMaster := 0.U
+  val tlbextraread = csrtlb.io.csrread.get
+  tlbextraread.readIdx := TLBIDX.asTypeOf(new TLBIDXStruct).index
+
+  when (valid && func === La32rCSROpType.tlbsrch) {
+    when (tlbextraread.hit) {
+      TLBIDX.index := tlbextraread.hitIdx
+      TLBIDX.NE := 0.U
+    }.otherwise {
+      TLBIDX.NE := 1.U
+    }
+  }
+
+  when (valid && func === La32rCSROpType.tlbrd) {
+    val readtlbhi = tlbextraread.readTlbHi.asTypeOf(new TLBHIStruct)
+    val readtlblo0 = tlbextraread.readTlbLo0.asTypeOf(new TLBLOStruct)
+    val readtlblo1 = tlbextraread.readTlbLo1.asTypeOf(new TLBLOStruct)
+    val readtlbloVec = Seq(readtlblo0, readtlblo1)
+    val TLBELOVec = Seq(TLBELO0, TLBELO1)
+    when(readtlbhi.e === 1.U) {
+      TLBEHI.VPPN := readtlbhi.vppn
+      TLBELOVec.zip(readtlbloVec).foreach { case (tlbelo, readtlblo) =>
+        tlbelo.V := readtlblo.v
+        tlbelo.D := readtlblo.d
+        tlbelo.PLV := readtlblo.plv
+        tlbelo.MAT := readtlblo.mat
+        tlbelo.G := readtlbhi.g
+        tlbelo.PPN := readtlblo.ppn
+      }
+      TLBIDX.PS := readtlbhi.ps
+      TLBIDX.NE := 0.U
+    }.otherwise {
+      TLBIDX.NE := 1.U
+      ASID.ASID := 0.U
+      TLBEHI := 0.U.asTypeOf(TLBEHI)
+      TLBELO0 := 0.U.asTypeOf(TLBELO0)
+      TLBELO1 := 0.U.asTypeOf(TLBELO1)
+      TLBIDX.PS := 0.U
+    }
+  }
+
+
+
+  // redirect
   val hasSideEffectOp = valid && (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
-  
+
   io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp
   io.redirect.rtype := 0.U // TODO : what is this
-  io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, EENTRY, io.cfIn.pc + 4.U))
+  io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, exceptionEntry, io.cfIn.pc + 4.U))
 
 
   io.in.ready := true.B
@@ -505,11 +652,11 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     difftest.io.era := RegNext(ERA)
     difftest.io.badv := RegNext(BADV)
     difftest.io.eentry := RegNext(EENTRY)
-    difftest.io.tlbidx := RegNext(TLBIDX)
-    difftest.io.tlbehi := RegNext(TLBEHI)
-    difftest.io.tlbelo0 := RegNext(TLBELO0)
-    difftest.io.tlbelo1 := RegNext(TLBELO1)
-    difftest.io.asid := RegNext(ASID)
+    difftest.io.tlbidx := RegNext(TLBIDX.asUInt())
+    difftest.io.tlbehi := RegNext(TLBEHI.asUInt())
+    difftest.io.tlbelo0 := RegNext(TLBELO0.asUInt())
+    difftest.io.tlbelo1 := RegNext(TLBELO1.asUInt())
+    difftest.io.asid := RegNext(ASID.asUInt())
     difftest.io.pgdl := RegNext(PGDL)
     difftest.io.pgdh := RegNext(PGDH)
     difftest.io.pgd := RegNext(PGD)

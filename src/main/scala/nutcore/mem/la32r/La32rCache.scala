@@ -23,11 +23,14 @@ trait HasLa32rCacheIO {
 }
 
 class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule with HasLa32rCacheIO with HasLa32rCSRConst {
+  assert(cacheName == "icache" || cacheName == "dcache")
   val s_idle :: s_memReq :: s_memResp :: s_mmioReq :: s_mmioResp :: s_wait_resp :: Nil = Enum(6)
   val state = RegInit(s_idle)
 
   val ismmio = io.mat === StronglyOrderedUncached
   val ismmioRec = RegEnable(ismmio, io.in.req.fire())
+
+  val hasTlbExcp = WireInit(false.B)
 
   val needFlush = RegInit(false.B)
   when (io.flush(0) && (state =/= s_idle)) { needFlush := true.B }
@@ -41,13 +44,15 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
       when (io.in.req.fire() && !io.flush(0)) { state := Mux(ismmio, s_mmioReq, s_memReq) }
     }
     is (s_memReq) {
-      when (io.out.mem.req.fire()) { state := s_memResp }
+      when (hasTlbExcp) { state := s_wait_resp }
+      .elsewhen (io.out.mem.req.fire()) { state := s_memResp }
     }
     is (s_memResp) {
       when (io.out.mem.resp.fire()) { state := s_wait_resp }
     }
     is (s_mmioReq) {
-      when (io.mmio.req.fire()) { state := s_mmioResp }
+      when (hasTlbExcp) { state := s_wait_resp }
+      .elsewhen (io.mmio.req.fire()) { state := s_mmioResp }
     }
     is (s_mmioResp) {
       when (io.mmio.resp.fire() || alreadyOutFire) { state := s_wait_resp }
@@ -74,20 +79,25 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
   io.in.resp.bits.rdata := Mux(ismmioRec, mmiordata, memrdata)
   io.in.resp.bits.cmd := Mux(ismmioRec, mmiocmd, memcmd)
 
-  val isReadDevice = cmd === SimpleBusCmd.read && DeviceSpace.isDevice(reqaddr)
-  val memuser = if (name == "dcache") isReadDevice else RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
+  val memuser = RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
   io.in.resp.bits.user.zip(if (userBits > 0) Some(memuser) else None).map { case (o,i) => o := i }
+
+  if (cacheName == "icache") {
+    hasTlbExcp := memuser.asTypeOf(new ImmuUserBundle).tlbExcp.asUInt().orR
+  } else {
+    hasTlbExcp := memuser.asTypeOf(new DmmuUserBundle).tlbExcp.asUInt().orR
+  }
 
   io.out.mem.req.bits.apply(addr = reqaddr,
     cmd = cmd, size = size,
     wdata = wdata, wmask = wmask)
-  io.out.mem.req.valid := (state === s_memReq)
+  io.out.mem.req.valid := (state === s_memReq && !hasTlbExcp)
   io.out.mem.resp.ready := true.B
 
   io.mmio.req.bits.apply(addr = reqaddr,
     cmd = cmd, size = size,
     wdata = wdata, wmask = wmask)
-  io.mmio.req.valid := (state === s_mmioReq)
+  io.mmio.req.valid := (state === s_mmioReq && !hasTlbExcp)
   io.mmio.resp.ready := true.B
 
   io.out.coh := DontCare

@@ -21,11 +21,11 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   val memXbar = Module(new SimpleBusCrossbarNto1(4))
 
-  val immu = La32rMMU(in = frontend.io.imem, enable = HasIMMU)(La32rMMUConfig(name = "immu", userBits = immuUserBits))
+  val immu = La32rMMU(in = frontend.io.imem, enable = HasIMMU)(La32rMMUConfig(name = "immu", userBits = immuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum")))
 
-  val icache = La32rCache(in = immu.io.out, mmio = memXbar.io.in(2), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), mat = immu.io.memoryAccessType, enable = HasIcache)(CacheConfig(ro = true, name = "icache", userBits = ICacheUserBundleWidth))
+  val icache = La32rCache(in = immu.io.out, mmio = memXbar.io.in(2), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), mat = immu.io.memoryAccessType, enable = HasIcache)(CacheConfig(ro = true, name = "icache", userBits = immuUserBits))
 
-  val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits))
+  val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum")))
 
   val dcache = La32rCache(in = dmmu.io.out, mmio = memXbar.io.in(0), flush = "b00".U, mat = dmmu.io.memoryAccessType, enable = HasDcache)(CacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits))
 

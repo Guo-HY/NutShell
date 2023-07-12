@@ -256,8 +256,8 @@ class IFU_ooo extends NutCoreModule with HasResetVector {
   BoringUtils.addSource(io.flushVec.orR, "perfCntCondMifuFlush")
 }
 
-class IFU_embedded extends NutCoreModule with HasResetVector {
-  assert(immuUserBits >= 68)
+class IFU_embedded extends NutCoreModule with HasResetVector with HasMemAccessMaster {
+
   val io = IO(new Bundle {
     val imem = new SimpleBusUC(userBits = immuUserBits, addrBits = VAddrBits) // userBits need contain brIdx
     val out = Decoupled(new CtrlFlowIO)
@@ -287,21 +287,33 @@ class IFU_embedded extends NutCoreModule with HasResetVector {
   io.flushVec := Mux(io.redirect.valid, "b1111".U, 0.U)
   io.bpFlush := false.B
 
+  val reqUserBits = Wire(new ImmuUserBundle)
+  reqUserBits.pc := pc
+  reqUserBits.npc := npc
+  reqUserBits.brIdx := Mux(io.redirect.valid, 0.U, Cat(0.U(3.W), bpu.io.out.valid))
+  reqUserBits.memAccessMaster := FETCH
+  reqUserBits.tlbExcp := 0.U.asTypeOf(reqUserBits.tlbExcp)
+
   io.imem := DontCare
-  io.imem.req.bits.apply(addr = pc, size = "b10".U, cmd = SimpleBusCmd.read, wdata = 0.U, wmask = 0.U, user = Cat(Mux(io.redirect.valid, 0.U, Cat(0.U(3.W), bpu.io.out.valid)), pc, npc))
+  io.imem.req.bits.apply(addr = pc, size = "b10".U, cmd = SimpleBusCmd.read, wdata = 0.U, wmask = 0.U, user = reqUserBits.asUInt())
   io.imem.req.valid := io.out.ready
   io.imem.resp.ready := io.out.ready || io.flushVec(0)
 
   io.out.bits := DontCare
   io.out.bits.instr := io.imem.resp.bits.rdata
-  io.imem.resp.bits.user.map{ case x =>
-    io.out.bits.brIdx := x(67 ,2*VAddrBits)
-    io.out.bits.pc := x(2*VAddrBits-1, VAddrBits)
-    io.out.bits.pnpc := x(VAddrBits-1, 0)
-  }
+  val respUserBits = io.imem.resp.bits.user.get.asTypeOf(new ImmuUserBundle)
+  io.out.bits.brIdx := respUserBits.brIdx
+  io.out.bits.pc := respUserBits.pc
+  io.out.bits.pnpc := respUserBits.npc
+
   io.out.valid := io.imem.resp.valid && !io.flushVec(0)
   io.out.bits.exceptionVec.foreach(_ := false.B)
-  if (IsLa32r) io.out.bits.exceptionVec(ADEF) := io.out.valid && io.out.bits.pc(1, 0).orR
+  if (IsLa32r) {
+    io.out.bits.exceptionVec(ADEF) := io.out.valid && io.out.bits.pc(1, 0).orR
+    io.out.bits.exceptionVec(TLBR) := io.out.valid && respUserBits.tlbExcp.tlbRefillExcp
+    io.out.bits.exceptionVec(PIF) := io.out.valid && respUserBits.tlbExcp.fetchPageInvalidExcp
+    io.out.bits.exceptionVec(PPI) := io.out.valid && respUserBits.tlbExcp.pagePrivInvalidExcp
+  }
   Debug(io.imem.req.fire(), "[IFI] pc=%x user=%x redirect %x npc %x pc %x pnpc %x\n", io.imem.req.bits.addr, io.imem.req.bits.user.getOrElse(0.U), io.redirect.valid, npc, pc, bpu.io.out.target)
   Debug(io.out.fire(), "[IFO] pc=%x user=%x inst=%x npc=%x ipf %x brIdx=%d\n", io.out.bits.pc, io.imem.resp.bits.user.get, io.out.bits.instr, io.out.bits.pnpc, io.ipf, io.out.bits.brIdx)
 

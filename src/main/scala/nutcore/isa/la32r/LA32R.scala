@@ -127,12 +127,9 @@ object LA32R_PRIVInstr extends HasLa32rInstrType with HasNutCoreParameter {
 
 object LA32R_MISCInstr extends HasLa32rInstrType with HasNutCoreParameter {
   def CACOP     = BitPat("b0 0 0 0 0 1 1 0 0 0_????????????_?????_?????")
-  def TLBSRCH   = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 0_0 0 0 0 0_0 0 0 0 0")
-  def TLBRD     = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 1_0 0 0 0 0_0 0 0 0 0")
-  def TLBWR     = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 0_0 0 0 0 0_0 0 0 0 0")
-  def TLBFILL   = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 1_0 0 0 0 0_0 0 0 0 0")
+
   def IDLE      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 1_???????????????")
-  def INVTLB    = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 1 1_?????_?????_?????")
+
   def PRELD     = BitPat("b0 0 1 0 1 0 1 0 1 1_????????????_?????_?????")
   def DBAR      = BitPat("b0 0 1 1 1 0 0 0 0 1 1 1 0 0 1 0 0_???????????????")
   def IBAR      = BitPat("b0 0 1 1 1 0 0 0 0 1 1 1 0 0 1 0 1_???????????????")
@@ -149,6 +146,11 @@ object LA32R_CSRInstr extends HasLa32rInstrType with HasNutCoreParameter {
   def BREAK     = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 0 0_???????????????")
   def SYSCALL   = BitPat("b0 0 0 0 0 0 0 0 0 0 1 0 1 0 1 1 0_???????????????")
   def ERTN      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 1 0_0 0 0 0 0_0 0 0 0 0")
+  def TLBSRCH = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 0_0 0 0 0 0_0 0 0 0 0")
+  def TLBRD = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 0 1 1_0 0 0 0 0_0 0 0 0 0")
+  def TLBWR = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 0_0 0 0 0 0_0 0 0 0 0")
+  def TLBFILL = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 1_0 0 0 0 0_0 0 0 0 0")
+  def INVTLB = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 1 1_?????_?????_?????")
 
   val table = Array(// (instrType, FuType, FuOpType, isrfWen)
     CSR     -> List(Instr2R, FuType.csr, La32rCSROpType.csracc, true.B),
@@ -158,5 +160,10 @@ object LA32R_CSRInstr extends HasLa32rInstrType with HasNutCoreParameter {
     BREAK   -> List(InstrCODE15, FuType.csr, La32rCSROpType.break, false.B),
     SYSCALL -> List(InstrCODE15, FuType.csr, La32rCSROpType.syscall, false.B),
     ERTN    -> List(InstrCODE15, FuType.csr, La32rCSROpType.ertn, false.B),
+    TLBSRCH -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbsrch, false.B),
+    TLBRD   -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbrd, false.B),
+    TLBWR   -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbwr, false.B),
+    TLBFILL -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbfill, false.B),
+    INVTLB  -> List(Instr3R, FuType.csr, La32rCSROpType.invtlb, false.B),
   )
 }

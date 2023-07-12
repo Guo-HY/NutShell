@@ -69,7 +69,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   // val csr = if (Settings.get("MmodeOnly")) Module(new CSR_M) else Module(new CSR)
   val csr = if (IsLa32r) Module(new La32rCSR()) else Module(new CSR)
   val csrOut = csr.access(valid = fuValids(FuType.csr), src1 = src1, src2 = src2, func = fuOpType)
-  csr.io.cfIn := io.in.bits.cf
+  csr.io.cfIn := io.in.bits.cf // TODO : this connect does not support ooo exec
   csr.io.la32rLSUExcp := lsu.io.la32rExcp
   if (!IsLa32r) {
     csr.io.cfIn.exceptionVec(loadAddrMisaligned) := lsu.io.loadAddrMisaligned
