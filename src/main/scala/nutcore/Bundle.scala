@@ -60,7 +60,7 @@ class CtrlFlowIO extends NutCoreBundle {
   val pnpc = Output(UInt(VAddrBits.W))
   val redirect = new RedirectIO
   val exceptionVec = Output(Vec(16, Bool()))
-  val intrVec = Output(Vec(12, Bool()))
+  val intrVec = Output(Vec(13, Bool()))
   val brIdx = Output(UInt(4.W))
   val isRVC = Output(Bool())
   val crossPageIPFFix = Output(Bool())
