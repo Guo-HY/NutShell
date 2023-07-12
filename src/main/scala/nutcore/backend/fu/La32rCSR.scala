@@ -383,7 +383,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(PME) := io.la32rLSUExcp.tlbExcp.pageModifyExcp
   csrExceptionVec(INE) := valid && func === La32rCSROpType.invtlb && io.cfIn.instr(4, 0) > 6.U
 
-  val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, valid)) | csrExceptionVec.asUInt
+  val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, io.instrValid)) | csrExceptionVec.asUInt
   val raiseException = exceptionVec.orR
   val excptionNO = PriorityEncoder(exceptionVec)
   io.wenFix := raiseException // TODO : what is this
