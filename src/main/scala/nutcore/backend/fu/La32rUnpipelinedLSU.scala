@@ -65,25 +65,13 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   val isStore = La32rLSUOpType.isStore(holdFunc)
   val partialLoad = La32rLSUOpType.isLoad(holdFunc) && (holdFunc =/= La32rLSUOpType.lw)
 
-  val s_idle :: s_wait_tlb :: s_wait_resp :: s_partialLoad :: Nil = Enum(4)
+  val s_idle :: s_wait_resp :: s_partialLoad :: Nil = Enum(3)
   val state = RegInit(s_idle)
-
-  val dtlbFinish = WireInit(false.B)
-  val dtlbEnable = WireInit(false.B)
-  if (Settings.get("HasDTLB")) {
-    BoringUtils.addSink(dtlbFinish, "DTLBFINISH")
-    BoringUtils.addSink(dtlbEnable, "DTLBENABLE")
-  }
-
-  io.dtlbPF := DontCare
 
   switch(state) {
     is(s_idle) {
-      when(dmem.req.fire && dtlbEnable) { state := s_wait_tlb }
-      when(dmem.req.fire && !dtlbEnable) { state := s_wait_resp }
+      when(dmem.req.fire) { state := s_wait_resp }
     }
-    // we not implement la32 tlb yet
-    is(s_wait_tlb) { assert(false.B) }
     is(s_wait_resp) {
       when(dmem.resp.fire) { state := Mux(partialLoad, s_partialLoad, s_idle) }
     }
@@ -104,11 +92,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     wmask = genWmask(vaddr, size),
     cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read),
     user = reqUserBits.asUInt())
-  dmem.req.valid := valid && (state === s_idle) && !io.la32rExcp.hasExcp
+  dmem.req.valid := valid && (state === s_idle)
   dmem.resp.ready := partialLoad || io.out.ready
 
   io.in.ready := (state === s_idle) && dmem.req.ready
-  io.out.valid := Mux(io.la32rExcp.hasExcp, true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
+  io.out.valid := Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp))
 
   val rdata = dmem.resp.bits.rdata
   val rdataDelay1 = RegNext(rdata)
@@ -136,10 +124,10 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     "b10".U -> (vaddr(1, 0) === 0.U)
   ))
 
-  val respUserBits = dmem.resp.bits.user.get.asTypeOf(new DmmuUserBundle)
+  val respUserBits = HoldUnless(dmem.resp.bits.user.get.asTypeOf(new DmmuUserBundle), dmem.resp.fire)
 
-  io.la32rExcp.hasExcp := io.la32rExcp.ale | respUserBits.tlbExcp.asUInt().orR
-  io.la32rExcp.ale := valid && !addrAligned
+  io.la32rExcp.hasExcp := (io.la32rExcp.ale | respUserBits.tlbExcp.asUInt().orR) && io.out.valid
+  io.la32rExcp.ale := io.out.valid && !addrAligned
   io.la32rExcp.badv := vaddr
   io.la32rExcp.tlbExcp := respUserBits.tlbExcp
 
@@ -162,6 +150,13 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   BoringUtils.addSink(lrAddr, "lr_addr")
   io.loadAddrMisaligned := DontCare
   io.storeAddrMisaligned := DontCare
+  val dtlbFinish = WireInit(false.B)
+  val dtlbEnable = WireInit(false.B)
+  if (Settings.get("HasDTLB")) {
+    BoringUtils.addSink(dtlbFinish, "DTLBFINISH")
+    BoringUtils.addSink(dtlbEnable, "DTLBENABLE")
+  }
+  io.dtlbPF := DontCare
 
 
   // storeData format need align with la32r-nemu,(see NEMU/src/memory/paddr.c : store_commit_queue_push)

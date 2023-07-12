@@ -93,7 +93,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   io.out.bits.decode := DontCare
   (io.out.bits.decode.ctrl, io.in.bits.ctrl) match { case (o, i) =>
     // TODO : actually do not need loadAddrMisaligned and storeAddrMisaligned when la32r enable
-    o.rfWen := i.rfWen && (!lsuTlbPF && !lsu.io.loadAddrMisaligned && !lsu.io.storeAddrMisaligned && !lsu.io.la32rExcp.hasExcp || !fuValids(FuType.lsu)) && !(csr.io.wenFix && fuValids(FuType.csr)) // TODO : csr cond may has bug
+    o.rfWen := i.rfWen && (!lsu.io.la32rExcp.hasExcp || !fuValids(FuType.lsu)) && !(csr.io.wenFix && fuValids(FuType.csr)) // TODO : csr cond may has bug
     o.rfDest := i.rfDest
     o.fuType := i.fuType
   }
