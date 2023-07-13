@@ -1,3 +1,3 @@
 [submodule "difftest"]
 	path = difftest
-	url = https://github.com/Guo-HY/difftest.git
+	url = ssh://git@gitlab.ci-lab.net:5997/eula/difftest.git
