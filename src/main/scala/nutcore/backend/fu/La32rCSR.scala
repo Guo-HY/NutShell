@@ -529,7 +529,8 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
 
   // redirect
-  val hasSideEffectOp = valid && (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
+  // NOTE : for brevity, we make all csr related inst redirect
+  val hasSideEffectOp = valid //&& (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
 
   io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp
   io.redirect.rtype := 0.U // TODO : what is this
