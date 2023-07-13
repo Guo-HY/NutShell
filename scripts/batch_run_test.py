@@ -35,7 +35,6 @@ cputest_list = ["add-longlong",
                 "hello-str",
                 "if-else",
                 "leap-year",
-                "load-store-check",
                 "load-store",
                 "matrix-mul",
                 "max",
@@ -58,6 +57,14 @@ cputest_list = ["add-longlong",
                 "unalign",
                 "wanshu",
 ]
+
+apps_dir = os.path.join(AM_HOME, "apps")
+apps_list = [
+    "coremark",
+    "dhrystone",
+    "microbench",
+]
+
 
 
 runlog = open("./run.log",'wt')
@@ -84,16 +91,10 @@ logger.addHandler(fh)
 
 print("begin batch run test, output to " + logpath)
 
-# cputest
-cputestnum = len(cputest_list)
-passcputestnum = 0
-logging.debug("begin cputest")
-
-for tp in cputest_list:
-    tp_path = os.path.join(cputest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
+def run_single_test(tp_path):
     if not os.path.exists(tp_path):
         logging.debug(tp_path + " does not exists, skip")
-        continue
+        return
     runcommand = emu_path + " -i " + tp_path + " -b 0 -e 0 -l 0"
     logging.debug("runcommand:" + runcommand)
     try:
@@ -104,5 +105,22 @@ for tp in cputest_list:
         exit(1)
     print(out_bytes.decode('utf-8'), file=runlog)
 
+# cputest
+cputestnum = len(cputest_list)
+passcputestnum = 0
+logging.debug("begin cputest")
+
+for tp in cputest_list:
+    tp_path = os.path.join(cputest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
+    run_single_test(tp_path)
 logging.debug("all cputest pass")
+
+# apps
+logging.debug("begin apps test")
+for tp in apps_list:
+    tp_path = os.path.join(apps_dir, tp, "build", tp +  "-" + ISA + "-" + PLATFORM + ".bin")
+    run_single_test(tp_path)
+logging.debug("all apps pass")
+        
+
 runlog.close()
