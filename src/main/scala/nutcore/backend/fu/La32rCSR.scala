@@ -25,6 +25,7 @@ object La32rCSROpType {
   def tlbwr = 15.U
   def tlbfill = 16.U
   def invtlb = 17.U // src1 = rj ,src2 = rk
+  def idle = 18.U
 
 }
 
@@ -375,7 +376,12 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(SYS) := valid && func === La32rCSROpType.syscall
   csrExceptionVec(BRK) := valid && func === La32rCSROpType.break
   csrExceptionVec(ALE) := io.la32rLSUExcp.ale
-  csrExceptionVec(IPE) := valid && !(func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U)) && CRMD.PLV === 3.U
+  val isPrivInst = valid && (func === La32rCSROpType.csrrd || func === La32rCSROpType.csrwr ||
+    func === La32rCSROpType.csrxchg || (func === La32rCSROpType.cacop && (cacopCode === 8.U || cacopCode === 9.U)) ||
+    func === La32rCSROpType.tlbsrch || func === La32rCSROpType.tlbrd || func === La32rCSROpType.tlbwr ||
+    func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb || func === La32rCSROpType.ertn
+    || func === La32rCSROpType.idle)
+  csrExceptionVec(IPE) := isPrivInst && CRMD.PLV === 3.U
   csrExceptionVec(TLBR) := io.la32rLSUExcp.tlbExcp.tlbRefillExcp
   csrExceptionVec(PIL) := io.la32rLSUExcp.tlbExcp.loadPageInvalidExcp
   csrExceptionVec(PIS) := io.la32rLSUExcp.tlbExcp.storePageInvalidExcp
@@ -529,7 +535,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
 
   // redirect
-  // NOTE : for brevity, we make all csr related inst redirect
+  // NOTE : for brevity, make all csr related inst redirect
   val hasSideEffectOp = valid //&& (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
 
   io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp
