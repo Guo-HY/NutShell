@@ -101,9 +101,11 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   io.out.bits.decode.cf.instr := io.in.bits.cf.instr
   io.out.bits.decode.cf.runahead_checkpoint_id := io.in.bits.cf.runahead_checkpoint_id
   io.out.bits.decode.cf.isBranch := io.in.bits.cf.isBranch
+  // NOTE : need make branch mispred redirect piority higher than csr,
+  // when csr redirect priority higher than alu & is interrupt or excp & is in mispred control flow, it wrong
   io.out.bits.decode.cf.redirect <>
-    Mux(mou.io.redirect.valid, mou.io.redirect,
-      Mux(csr.io.redirect.valid, csr.io.redirect, alu.io.redirect))
+    Mux(alu.io.redirect.valid, alu.io.redirect,
+      Mux(csr.io.redirect.valid, csr.io.redirect, mou.io.redirect))
   
   Debug(mou.io.redirect.valid || csr.io.redirect.valid || alu.io.redirect.valid, "[REDIRECT] mou %x csr %x alu %x \n", mou.io.redirect.valid, csr.io.redirect.valid, alu.io.redirect.valid)
   Debug(mou.io.redirect.valid || csr.io.redirect.valid || alu.io.redirect.valid, "[REDIRECT] flush: %d mou %x csr %x alu %x\n", io.flush, mou.io.redirect.target, csr.io.redirect.target, alu.io.redirect.target)
