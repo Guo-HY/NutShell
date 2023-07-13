@@ -102,7 +102,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   io.out.bits.decode.cf.runahead_checkpoint_id := io.in.bits.cf.runahead_checkpoint_id
   io.out.bits.decode.cf.isBranch := io.in.bits.cf.isBranch
   // NOTE : need make branch mispred redirect piority higher than csr,
-  // when csr redirect priority higher than alu & is interrupt or excp & is in mispred control flow, it wrong
+  // when csr redirect priority higher than alu & is interrupt or excp attach on mispred control flow inst, it go wrong
   io.out.bits.decode.cf.redirect <>
     Mux(alu.io.redirect.valid, alu.io.redirect,
       Mux(csr.io.redirect.valid, csr.io.redirect, mou.io.redirect))
