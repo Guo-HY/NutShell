@@ -59,7 +59,6 @@ trait HasLa32rCSRConst {
   val TICLRaddr     = 0x44
   val LLBCTLaddr    = 0x60
   val TLBRENTRYaddr = 0x88
-  val CTAGaddr      = 0x98
   val DMW0addr      = 0x180
   val DMW1addr      = 0x181
 
@@ -228,7 +227,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
   // reg define
   val EUEN, ECFG, ERA, BADV, EENTRY, PGDL, PGDH, CPUID,
-  SAVE0, SAVE1, SAVE2, SAVE3, TID, TCFG, TVAL, TICLR, TLBRENTRY, CTAG, DMW0, DMW1 = RegInit(UInt(XLEN.W), 0.U)
+  SAVE0, SAVE1, SAVE2, SAVE3, TID, TCFG, TVAL, TICLR, TLBRENTRY, DMW0, DMW1 = RegInit(UInt(XLEN.W), 0.U)
   val CRMD = RegInit(8.U.asTypeOf(new CRMDStruct)) // when reset, DA = 1
   val PRMD = RegInit(0.U.asTypeOf(new PRMDStruct))
   val ASID = RegInit(0xA0000.U.asTypeOf(new ASIDStruct)) // we need set ASIDBITS=10, see spec 7.5.4
@@ -270,11 +269,10 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     MaskedRegMap(SAVE3addr, SAVE3),
     MaskedRegMap(TIDaddr, TID),
     MaskedRegMap(TCFGaddr, TCFG),
-    MaskedRegMap(TVALaddr, TVAL),
+    MaskedRegMap(TVALaddr, TVAL, MaskedRegMap.UnwritableMask, null),
     MaskedRegMap(TICLRaddr, TICLR, TICLRWmask, MaskedRegMap.NoSideEffect, MaskedRegMap.UnwritableMask),
     MaskedRegMap(LLBCTLaddr, LLBCTL.asUInt, MaskedRegMap.UnwritableMask, null),
     MaskedRegMap(TLBRENTRYaddr, TLBRENTRY, TLBRENTRYWmask),
-    MaskedRegMap(CTAGaddr, CTAG),
     MaskedRegMap(DMW0addr, DMW0, DMW0Wmask),
     MaskedRegMap(DMW1addr, DMW1, DMW1Wmask),
   ) ++ perfCntsLoMapping
