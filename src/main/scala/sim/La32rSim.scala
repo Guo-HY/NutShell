@@ -18,7 +18,6 @@ object DeviceSpace extends HasNutCoreParameter {
   // (start, size)
   def device = List(
     (Settings.getLong("ConfregBase1"), Settings.getLong("ConfregSize")), // confreg
-    (Settings.getLong("ConfregBase2"), Settings.getLong("ConfregSize")), // confreg
   )
 
   def isDevice(addr: UInt) = device.map(range => {
@@ -55,10 +54,7 @@ class SimTop extends Module  {
   memdelay.io.in <> memXbar.io.out(0).toAXI4()
   mem.io.in <> memdelay.io.out
 
- val confregXbar = Module(new SimpleBusCrossbarNto1(2))
-  confregXbar.io.in(0) <> memXbar.io.out(1)
-  confregXbar.io.in(1) <> memXbar.io.out(2)
-  confreg.io.in <> confregXbar.io.out.toAXI4Lite()
+  confreg.io.in <> memXbar.io.out(1).toAXI4Lite()
 
   val log_begin, log_end, log_level = WireInit(0.U(64.W))
   log_begin := io.logCtrl.log_begin
