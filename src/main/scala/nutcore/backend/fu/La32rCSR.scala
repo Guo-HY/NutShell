@@ -684,9 +684,9 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     diffTimerSync.io.clock := clock
     diffTimerSync.io.coreid := 0.U
     diffTimerSync.io.counter_id := RegNext(TID)
-    diffTimerSync.io.stable_counter_l := RegNext(stableCounter(31, 0))
-    diffTimerSync.io.stable_counter_h := RegNext(stableCounter(63, 32))
-    diffTimerSync.io.time_val := RegNext(TVAL)
+    diffTimerSync.io.stable_counter_l := RegNext(RegNext(stableCounter(31, 0)))
+    diffTimerSync.io.stable_counter_h := RegNext(RegNext(stableCounter(63, 32)))
+    diffTimerSync.io.time_val := RegNext(RegNext(TVAL))
   }
 
   // dirty implement to pass firrtl compile
