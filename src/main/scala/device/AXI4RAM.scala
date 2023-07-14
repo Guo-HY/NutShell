@@ -44,12 +44,12 @@ class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int,
   val offsetMask = (1 << offsetBits) - 1
 //  def index(addr: UInt) = (addr & offsetMask.U) >> log2Ceil(DataBytes)
   // NOTE : be careful that we use addr - resetvector to access memory, so other section should always after text section
-  def index(addr: UInt) = (addr - Settings.getLong("ResetVector").U) >> log2Ceil(DataBytes)
+  def index(addr: UInt) = (addr - Settings.getLong("RAMBase").U) >> log2Ceil(DataBytes)
   def inRange(idx: UInt) = idx < (memByte / 8).U
 
   val wIdx = index(waddr) + writeBeatCnt
   val rIdx = index(raddr) + readBeatCnt
-  val wen = in.w.fire() && inRange(wIdx)
+  val wen = in.w.fire() // && inRange(wIdx)
 
   val rdata = if (useBlackBox) {
     val mem = Module(new RAMHelper(memByte))

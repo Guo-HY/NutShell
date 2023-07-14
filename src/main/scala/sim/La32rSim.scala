@@ -37,7 +37,7 @@ class SimTop extends Module  {
 
   lazy val config = NutCoreConfig(FPGAPlatform = false)
   val core = Module(new La32rNutCore()(config))
-  val mem = Module(new AXI4RAM(memByte = 128 * 1024 * 1024, useBlackBox = true))
+  val mem = Module(new AXI4RAM(memByte = (Settings.getLong("RAMSize") - Settings.getLong("RAMBase")).toInt, useBlackBox = true))
   // Be careful with the commit checking of emu.
   // A large delay will make emu incorrectly report getting stuck.
   val memdelay = Module(new AXI4Delayer(0))
@@ -45,7 +45,7 @@ class SimTop extends Module  {
   val confreg = Module(new AXI4Confreg)
 
   val addrSpace = List(
-    (0x1c000000L, 0x8000000L), // 128 MB memory
+    (Settings.getLong("RAMBase"), Settings.getLong("RAMSize")),
   ) ++ DeviceSpace.device
 
   val memXbar = Module(new SimpleBusCrossbar1toN(addrSpace))
