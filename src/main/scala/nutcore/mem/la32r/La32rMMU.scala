@@ -70,7 +70,7 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
 
   val tlb = Module(new La32rTLB)
 
-  tlb.io.in.valid := io.in.req.valid
+  tlb.io.in.valid := io.in.req.valid && isTLB
   tlb.io.in.bits.vaddr := io.in.req.bits.addr
   if (mmuname == "immu") {
     tlb.io.in.bits.memAccessMaster := io.in.req.bits.user.get.asTypeOf(new ImmuUserBundle).memAccessMaster
