@@ -288,7 +288,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   // handle csr access inst
   val addr = io.cfIn.instr(23, 10)
   val rdata = Wire(UInt(XLEN.W))
-  val wdata = Mux(func === La32rCSROpType.csrxchg, src1 & src2, src2)
+  val wdata = Mux(func === La32rCSROpType.csrxchg, MaskData(rdata, src2, src1) /*(src1 & src2) | (rdata & (~src1).asUInt())*/, src2)
   val wen = valid && (func === La32rCSROpType.csrxchg || func === La32rCSROpType.csrwr) && !io.isBackendException
   MaskedRegMap.generate(mapping, addr, rdata, wen, wdata)
 
@@ -300,28 +300,28 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
   // fix csr reg software write
   when(wen && addr === CRMDaddr.U) {
-    CRMD := (wdata & CRMDWmask).asTypeOf(CRMD)
+    CRMD := MaskData(CRMD.asUInt(), wdata, CRMDWmask).asTypeOf(CRMD)
   }
   when(wen && addr === PRMDaddr.U) {
-    PRMD := (wdata & PRMDWmask).asTypeOf(PRMD)
+    PRMD := MaskData(PRMD.asUInt(), wdata, PRMDWmask).asTypeOf(PRMD)
   }
   when(wen && addr === LLBCTLaddr.U) {
-    LLBCTL := (wdata & LLBCTLWmask).asTypeOf(LLBCTL)
+    LLBCTL := MaskData(LLBCTL.asUInt(),wdata, LLBCTLWmask).asTypeOf(LLBCTL)
   }
   when(wen && addr === TLBIDXaddr.U) {
-    TLBIDX := (wdata & TLBIDXWmask).asTypeOf(TLBIDX)
+    TLBIDX := MaskData(TLBIDX.asUInt(), wdata, TLBIDXWmask).asTypeOf(TLBIDX)
   }
   when(wen && addr === TLBEHIaddr.U) {
-    TLBEHI := (wdata & TLBEHIWmask).asTypeOf(TLBEHI)
+    TLBEHI := MaskData(TLBEHI.asUInt(), wdata, TLBEHIWmask).asTypeOf(TLBEHI)
   }
   when(wen && addr === TLBELO0addr.U) {
-    TLBELO0 := (wdata & TLBELO0Wmask).asTypeOf(TLBELO0)
+    TLBELO0 := MaskData(TLBELO0.asUInt(), wdata, TLBELO0Wmask).asTypeOf(TLBELO0)
   }
   when(wen && addr === TLBELO1addr.U) {
-    TLBELO1 := (wdata & TLBELO1Wmask).asTypeOf(TLBELO1)
+    TLBELO1 := MaskData(TLBELO1.asUInt(), wdata, TLBELO1Wmask).asTypeOf(TLBELO1)
   }
   when(wen && addr === ASIDaddr.U) {
-    ASID := (wdata & ASIDWmask).asTypeOf(ASID)
+    ASID := MaskData(ASID.asUInt(), wdata, ASIDWmask).asTypeOf(ASID)
   }
 
   // timer(TVAL)
