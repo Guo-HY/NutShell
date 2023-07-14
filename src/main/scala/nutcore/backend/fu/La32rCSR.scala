@@ -70,8 +70,9 @@ trait HasLa32rCSRConst {
   val ESTATWmask    = "b11".U(32.W)
   val EENTRYWmask   = 0xFFFFFFC0.S(32.W).asUInt
   val CPUIDWmask    = 0.U(32.W)
-  val LLBCTLWmask   = "b110".U(32.W)
-  val TLBIDXWmask   = "b1_0_111111_00000000_1111111111111111".U(32.W).asUInt
+  val LLBCTLWmask   = "b100".U(32.W) // WCLLB is not write visible to align with nemu
+  val TLBIDXWmask   = "b1_0_111111_00000000_0000000000000000".U(32.W).asUInt() | Fill(log2Up(Settings.getInt("TlbEntryNum")), true.B)
+//  val TLBIDXWmask   = "b1_0_111111_00000000_1111111111111111".U(32.W).asUInt
   val TLBEHIWmask   = 0xFFFFE000.S(32.W).asUInt
   val TLBELO0Wmask  = 0xFFFFF7F.S(32.W).asUInt // we assume PALEN = 32
   val TLBELO1Wmask  = 0xFFFFF7F.S(32.W).asUInt
