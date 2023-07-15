@@ -64,6 +64,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   val dmem = io.dmem
   val isStore = La32rLSUOpType.isStore(holdFunc)
   val partialLoad = La32rLSUOpType.isLoad(holdFunc) && (holdFunc =/= La32rLSUOpType.lw)
+  val addrAligned = WireInit(false.B)
 
   val s_idle :: s_wait_resp :: s_partialLoad :: Nil = Enum(3)
   val state = RegInit(s_idle)
@@ -94,11 +95,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     wmask = genWmask(vaddr, size),
     cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read),
     user = reqUserBits.asUInt())
-  dmem.req.valid := valid && (state === s_idle)
+  dmem.req.valid := valid && (state === s_idle) && addrAligned
   dmem.resp.ready := partialLoad || io.out.ready
 
   io.in.ready := (state === s_idle) && dmem.req.ready
-  io.out.valid := Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp))
+  io.out.valid := Mux(valid && !addrAligned, true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
 
   val rdata = dmem.resp.bits.rdata
   val rdataDelay1 = RegNext(rdata)
@@ -120,7 +121,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
 
   io.out.bits := Mux(partialLoad, rdataPartialLoad, rdata(XLEN - 1, 0))
 
-  val addrAligned = LookupTree(holdFunc(1, 0), List(
+  addrAligned := LookupTree(holdFunc(1, 0), List(
     "b00".U -> true.B,
     "b01".U -> (vaddr(0) === 0.U),
     "b10".U -> (vaddr(1, 0) === 0.U)
