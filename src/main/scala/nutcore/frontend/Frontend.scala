@@ -24,7 +24,7 @@ import bus.simplebus._
 import chisel3.experimental.IO
 
 class FrontendIO(implicit val p: NutCoreConfig) extends Bundle with HasNutCoreConst {
-  val imem = new SimpleBusUC(userBits = ICacheUserBundleWidth, addrBits = VAddrBits)
+  val imem = new SimpleBusUC(userBits = immuUserBits, addrBits = VAddrBits)
   val out = Vec(2, Decoupled(new DecodeIO))
   val flushVec = Output(UInt(4.W))
   val redirect = Flipped(new RedirectIO)
