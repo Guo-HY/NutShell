@@ -300,7 +300,8 @@ class IFU_embedded extends NutCoreModule with HasResetVector with HasMemAccessMa
   io.imem.resp.ready := io.out.ready || io.flushVec(0)
 
   io.out.bits := DontCare
-  io.out.bits.instr := io.imem.resp.bits.rdata
+  // send nop when check excp
+  io.out.bits.instr := Mux(io.out.bits.exceptionVec.asUInt().orR, La32rInstructions.NOP, io.imem.resp.bits.rdata)
   val respUserBits = io.imem.resp.bits.user.get.asTypeOf(new ImmuUserBundle)
   io.out.bits.brIdx := respUserBits.brIdx
   io.out.bits.pc := respUserBits.pc
