@@ -237,7 +237,8 @@ class La32rDecoder(implicit override val p: NutCoreConfig) extends AbstractDecod
   val rfSrc1 = rj
   val rfSrc2 = Mux(fuType === FuType.bru && La32rALUOpType.isBranch(outFuOpType)
     || fuType === FuType.lsu && La32rLSUOpType.isStore(outFuOpType), rd, rk)
-  val rfDest = Mux(fuType === FuType.bru && (fuOpType === La32rALUOpType.call), 1.U ,rd)
+  val rfDest = Mux(fuType === FuType.csr && fuOpType === La32rCSROpType.rdcntid, rj,
+    Mux(fuType === FuType.bru && (fuOpType === La32rALUOpType.call), 1.U ,rd))
 
   io.out.bits.ctrl.rfSrc1 := Mux(src1Type === SrcType.imm , 0.U, rfSrc1)
   io.out.bits.ctrl.rfSrc2 := Mux(src2Type === SrcType.imm , 0.U, rfSrc2)
