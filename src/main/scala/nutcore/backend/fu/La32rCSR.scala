@@ -323,22 +323,34 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     ASID := MaskData(ASID.asUInt(), wdata, ASIDWmask).asTypeOf(ASID)
   }
 
-  // timer(TVAL)
+  // timer(TVAL)  , see chiplab/IP/myCPU/csr.v
+  val timer_en = RegInit(false.B)
   val timerInterrupt = ESTAT.TI
 
-  when(tcfgStruct.En.asBool) {
-    when(TVAL === 0.U) {
-      timerInterrupt := true.B
-    }
+  when(timer_en && (TVAL === 0.U)) {
+    timerInterrupt := true.B
+    timer_en := tcfgStruct.Periodic
+  }
+
+  when(wen && addr === TCFGaddr.U) {
+    timer_en := wdata(0)
+  }
+
+  when (timer_en) {
     when(TVAL =/= 0.U) {
       TVAL := TVAL - 1.U
     }
-    when(TVAL === 0.U && tcfgStruct.Periodic.asBool) {
-      TVAL := Cat(tcfgStruct.InitVal, 0.U(2.W))
+    when(TVAL === 0.U) {
+      TVAL := Mux(tcfgStruct.Periodic.asBool(), Cat(tcfgStruct.InitVal, 0.U(2.W)), Fill(32, true.B))
     }
   }
 
-  when(wen && addr === TICLRaddr.U && wdata(0) === 1.U) {
+  when(wen && addr === TCFGaddr.U) {
+    TVAL := Cat(src2(31, 2), 0.U(2.W))
+  }
+
+  val clearTimerInterrupt = wen && addr === TICLRaddr.U && wdata(0) === 1.U
+  when(clearTimerInterrupt) {
     timerInterrupt := false.B
   }
 
