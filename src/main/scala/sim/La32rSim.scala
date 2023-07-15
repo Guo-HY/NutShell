@@ -44,17 +44,17 @@ class SimTop extends Module  {
 
   val confreg = Module(new AXI4Confreg)
 
-  val addrSpace = List(
+  val addrSpace = DeviceSpace.device ++ List( // need set device before ram for memXbar select priority
     (Settings.getLong("RAMBase"), Settings.getLong("RAMSize")),
-  ) ++ DeviceSpace.device
+  )
 
   val memXbar = Module(new SimpleBusCrossbar1toN(addrSpace))
   memXbar.io.in <> core.io.mem
 
-  memdelay.io.in <> memXbar.io.out(0).toAXI4()
+  memdelay.io.in <> memXbar.io.out(1).toAXI4()
   mem.io.in <> memdelay.io.out
 
-  confreg.io.in <> memXbar.io.out(1).toAXI4Lite()
+  confreg.io.in <> memXbar.io.out(0).toAXI4Lite()
 
   val log_begin, log_end, log_level = WireInit(0.U(64.W))
   log_begin := io.logCtrl.log_begin

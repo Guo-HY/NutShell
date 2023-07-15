@@ -37,7 +37,7 @@ class RAMHelper(memByte: Int) extends BlackBox with HasNutCoreParameter {
   }).suggestName("io")
 }
 
-class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int,
+class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int, // TODO : dose need set memByte BigInt ?
   useBlackBox: Boolean = false) extends AXI4SlaveModule(_type) with HasNutCoreParameter {
 
   val offsetBits = log2Up(memByte)

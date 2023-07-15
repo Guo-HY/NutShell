@@ -708,7 +708,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     diffEstatSync.io.wmask := RegNext(RegNext(Fill(32, needSyncEstat)))
 
   }
-  io.difftestExceptionSkip := io.instrValid && raiseException && excptionNO === INT.U // TODO : deal soft int
+  io.difftestExceptionSkip := io.instrValid && raiseException && excptionNO === INT.U
 
   // dirty implement to pass firrtl compile
   val mtip = WireInit(false.B)

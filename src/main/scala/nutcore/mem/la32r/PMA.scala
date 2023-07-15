@@ -18,9 +18,7 @@ object PMA extends HasNutCoreParameter {
   ) ++ DeviceSpace.device
 
   def isValidAddr(addr: UInt) = addrSpace.map(range => {
-    require(isPow2(range._2))
-    val bits = log2Up(range._2)
-    (addr ^ range._1.U)(PAddrBits - 1, bits) === 0.U
+    addr >= range._1.U && addr < (range._1 + range._2).U
   }).reduce(_ || _)
 
 }
