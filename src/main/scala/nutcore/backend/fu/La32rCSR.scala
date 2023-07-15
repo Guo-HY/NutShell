@@ -699,7 +699,16 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     diffTimerSync.io.stable_counter_l := RegNext(RegNext(stableCounter(31, 0)))
     diffTimerSync.io.stable_counter_h := RegNext(RegNext(stableCounter(63, 32)))
     diffTimerSync.io.time_val := RegNext(RegNext(TVAL))
+
+    val diffEstatSync = Module(new DifftestLa32rEstatState)
+    diffEstatSync.io.clock := clock
+    diffEstatSync.io.coreid := 0.U
+    diffEstatSync.io.estat := RegNext(ESTAT.asUInt())
+    val needSyncEstat = io.instrValid && ((func === La32rCSROpType.excption && excptionNO === INT.U) || clearTimerInterrupt)
+    diffEstatSync.io.wmask := RegNext(RegNext(Fill(32, needSyncEstat)))
+
   }
+  io.difftestExceptionSkip := io.instrValid && raiseException && excptionNO =/= SYS.U && excptionNO =/= BRK.U // TODO : deal soft int
 
   // dirty implement to pass firrtl compile
   val mtip = WireInit(false.B)

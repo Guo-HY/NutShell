@@ -188,6 +188,7 @@ class CSRIO extends FunctionUnitIO {
   val dmemMMU = Flipped(new MMUIO)
   val wenFix = Output(Bool())
   val la32rLSUExcp = Flipped(new La32rLSUExcpIO)
+  val difftestExceptionSkip = Output(Bool()) // for interrupt difftest align
 }
 
 class AbstractCSR(implicit val p: NutCoreConfig) extends NutCoreModule{
