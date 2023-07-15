@@ -96,6 +96,8 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
     dmmuUserBits := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle)
     dmmuUserBits.tlbExcp := tlbExcp
     dmmuUserBits.isDeviceLoad := io.in.req.bits.cmd === SimpleBusCmd.read && DeviceSpace.isDevice(io.out.req.bits.addr)
+    dmmuUserBits.paddr := io.out.req.bits.addr
+    dmmuUserBits.isInvalidPaddr := !PMA.isValidAddr(io.out.req.bits.addr)
     io.out.req.bits.user.map(_ := dmmuUserBits.asUInt())
   }
 

@@ -38,10 +38,12 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
 
   val alreadyOutFire = RegEnable(true.B, init = false.B, io.in.resp.fire())
 
+  val isInvalidAddr = !PMA.isValidAddr(io.in.req.bits.addr)
+
   switch (state) {
     is (s_idle) {
       alreadyOutFire := false.B
-      when (io.in.req.fire() && !io.flush(0)) { state := Mux(ismmio, s_mmioReq, s_memReq) }
+      when (io.in.req.fire() && !io.flush(0)) { state := Mux(isInvalidAddr, s_wait_resp, Mux(ismmio, s_mmioReq, s_memReq)) }
     }
     is (s_memReq) {
       when (hasTlbExcp) { state := s_wait_resp }

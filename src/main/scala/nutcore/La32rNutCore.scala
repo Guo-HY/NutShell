@@ -13,6 +13,9 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
     val mem = new SimpleBusUC(addrBits = PAddrBits)
   })
 
+  println("dmmuUserBits=", dmmuUserBits)
+  println("immuUserBits=", immuUserBits)
+
   val frontend = Module(new Frontend_embedded)
 
   val backend = Module(new Backend_inorder)

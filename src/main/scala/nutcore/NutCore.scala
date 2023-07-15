@@ -39,6 +39,7 @@ trait HasNutCoreParameter {
   val HasIMMU = Settings.get("HasIMMU")
   val HasDMMU = Settings.get("HasDMMU")
 
+  // be careful bundle width !!!
   class ImmuUserBundle extends Bundle {
     val pc = Output(UInt(XLEN.W))
     val npc = Output(UInt(XLEN.W))
@@ -50,6 +51,8 @@ trait HasNutCoreParameter {
     val isDeviceLoad = Output(UInt(1.W))
     val memAccessMaster = Output(UInt(2.W))
     val tlbExcp = new La32rTLBExcpIO
+    val paddr = Output(UInt(32.W))
+    val isInvalidPaddr = Output(Bool())
   }
   val immuUserBits = (new ImmuUserBundle).getWidth
   val dmmuUserBits = (new DmmuUserBundle).getWidth

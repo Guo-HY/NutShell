@@ -84,6 +84,8 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   reqUserBits.isDeviceLoad := !isStore
   reqUserBits.memAccessMaster := Mux(isStore, STORE, LOAD)
   reqUserBits.tlbExcp := 0.U.asTypeOf(reqUserBits.tlbExcp)
+  reqUserBits.paddr := 0.U
+  reqUserBits.isInvalidPaddr := false.B
 
   dmem.req.bits.apply(
     addr = vaddr,
@@ -159,10 +161,11 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   io.dtlbPF := DontCare
 
 
+
   // storeData format need align with la32r-nemu,(see NEMU/src/memory/paddr.c : store_commit_queue_push)
-  io.storeCheck.valid := HoldReleaseLatch(valid=dmem.req.fire && isStore,release=io.out.fire, flush = false.B)
+  io.storeCheck.valid := HoldReleaseLatch(valid=dmem.req.fire && isStore,release=io.out.fire, flush = false.B) && !respUserBits.isInvalidPaddr
   val offset = vaddr(1, 0)
-  io.storeCheck.storeAddr := vaddr // TODO : we just use vaddr for check because now we doesn't have tlb
+  io.storeCheck.storeAddr := respUserBits.paddr
   io.storeCheck.storeData := Mux(La32rLSUOpType.isByteOp(holdFunc), (holdWdata & 0xff.U) << (offset << 3),
         Mux(La32rLSUOpType.isHalfOp(holdFunc), (holdWdata & 0xffff.U) << (offset << 3), holdWdata))
 
