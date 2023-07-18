@@ -1,3 +1,4 @@
 [submodule "difftest"]
 	path = difftest
 	url = ssh://git@gitlab.ci-lab.net:5997/eula/difftest.git
+	branch = la32r-nutshell
