@@ -130,9 +130,9 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   val respUserBits = HoldUnless(dmem.resp.bits.user.get.asTypeOf(new DmmuUserBundle), dmem.resp.fire)
 
   io.la32rExcp.hasExcp := (io.la32rExcp.ale | respUserBits.tlbExcp.asUInt().orR) && io.out.valid
-  io.la32rExcp.ale := io.out.valid && !addrAligned
+  io.la32rExcp.ale := io.out.fire && !addrAligned
   io.la32rExcp.badv := vaddr
-  io.la32rExcp.tlbExcp := respUserBits.tlbExcp
+  io.la32rExcp.tlbExcp := (respUserBits.tlbExcp.asUInt() & Fill(respUserBits.tlbExcp.getWidth, io.out.fire)).asTypeOf(respUserBits.tlbExcp)
 
 
   val isReadDevice = HoldReleaseLatch(valid=dmem.resp.valid && respUserBits.isDeviceLoad.asBool(), release=io.out.fire, flush=false.B)
