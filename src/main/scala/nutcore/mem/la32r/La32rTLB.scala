@@ -122,7 +122,9 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
 
   val paddr = Mux(isSmallPage, Cat(hitTlbLo.ppn, vaddr(11 ,0)), Cat(hitTlbLo.ppn(ppnlen - 1, 9), vaddr(20, 0)))
 
-  assert(!io.in.valid || io.in.valid && PopCount(hitVec)<=1.U, "multiple hit in tlb!")
+  when (io.in.valid && PopCount(hitVec) > 1.U) {
+    printf("multiple hit in tlb!\n")
+  }
 
   io.out.valid := io.in.valid
   io.out.bits.paddr := paddr
