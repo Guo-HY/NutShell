@@ -164,7 +164,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
 
 
   // storeData format need align with la32r-nemu,(see NEMU/src/memory/paddr.c : store_commit_queue_push)
-  io.storeCheck.valid := HoldReleaseLatch(valid=dmem.req.fire && isStore,release=io.out.fire, flush = false.B) && !respUserBits.isInvalidPaddr
+  io.storeCheck.valid := HoldReleaseLatch(valid=dmem.req.fire && isStore,release=io.out.fire, flush = false.B) && !respUserBits.isInvalidPaddr && !io.la32rExcp.hasExcp
   val offset = vaddr(1, 0)
   io.storeCheck.storeAddr := respUserBits.paddr
   io.storeCheck.storeData := Mux(La32rLSUOpType.isByteOp(holdFunc), (holdWdata & 0xff.U) << (offset << 3),
