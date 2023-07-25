@@ -8,6 +8,7 @@ import bus.axi4._
 import chisel3.experimental.IO
 import utils._
 import top.Settings
+import difftest._
 
 trait HasMemAccessMaster {
   val FETCH = 1.U
@@ -154,7 +155,7 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
   val invtlbOp = WireInit(0.U(5.W))
   val invtlbasid = WireInit(0.U(10.W))
   val invtlbvaddr = WireInit(0.U(32.W))
-  val TLBEHI , TLBELO0, TLBELO1, TLBIDX, ESTAT = WireInit(0.U(32.W))
+  val TLBEHI , TLBELO0, TLBELO1, TLBIDX, ESTAT, pc = WireInit(0.U(32.W))
   BoringUtils.addSink(tlbModifyValid, "tlbModifyValid")
   BoringUtils.addSink(tlbModifyOp, "tlbModifyOp")
   BoringUtils.addSink(invtlbOp, "invtlbOp")
@@ -165,6 +166,7 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
   BoringUtils.addSink(TLBELO1, "TLBELO1")
   BoringUtils.addSink(TLBIDX, "TLBIDX")
   BoringUtils.addSink(ESTAT, "ESTAT")
+  BoringUtils.addSink(pc, "tlbDebugPC")
   val tlbehiStruct = TLBEHI.asTypeOf(new TLBEHIStruct)
   val tlbelo0Struct = TLBELO0.asTypeOf(new TLBELOStruct)
   val tlbelo1Struct = TLBELO1.asTypeOf(new TLBELOStruct)
@@ -199,6 +201,9 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
     tlbEntrys(tlbWriteIdx).tlbhi := tlbhiWrite
     tlbEntrys(tlbWriteIdx).tlblo0 := tlblo0Write
     tlbEntrys(tlbWriteIdx).tlblo1 := tlblo1Write
+
+//    printf("tlbmodify:timer=0x%x,pc=0x%x,func=%d,idx=%d,tlbhi=0x%x,tlblo0=0x%x,tlblo1=0x%x\n",
+//      GTimer(),pc,tlbModifyOp,tlbWriteIdx,tlbhiWrite.asUInt(),tlblo0Write.asUInt(),tlblo1Write.asUInt())
   }
 
   when (tlbModifyValid && tlbModifyOp === La32rCSROpType.invtlb) {
@@ -212,9 +217,10 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
         (invtlbOp === 4.U && i.tlbhi.g === 0.U && i.tlbhi.asid === invtlbasid) ||
         (invtlbOp === 5.U && i.tlbhi.g === 0.U && i.tlbhi.asid === invtlbasid && fixvaddr === fixvppn) ||
         (invtlbOp === 6.U && (i.tlbhi.g === 1.U || i.tlbhi.asid === invtlbasid) && fixvaddr === fixvppn)) {
-        i.tlbhi := 0.U.asTypeOf(new TLBHIStruct)
-        i.tlblo0 := 0.U.asTypeOf(new TLBLOStruct)
-        i.tlblo1 := 0.U.asTypeOf(new TLBLOStruct)
+        i.tlbhi.e := false.B // align with nemu
+//        i.tlbhi := 0.U.asTypeOf(new TLBHIStruct)
+//        i.tlblo0 := 0.U.asTypeOf(new TLBLOStruct)
+//        i.tlblo1 := 0.U.asTypeOf(new TLBLOStruct)
       }
     }
   }
@@ -227,6 +233,24 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
     csrread.readTlbHi := tlbEntrys(csrread.readIdx).tlbhi.asUInt()
     csrread.readTlbLo0 := tlbEntrys(csrread.readIdx).tlblo0.asUInt()
     csrread.readTlbLo1 := tlbEntrys(csrread.readIdx).tlblo1.asUInt()
+  }
+
+  if (!la32rMMUConfig.FPGAPlatform && mmuname == "csr") { // only diff csr tlb because itlb,dtlb,csrtlb is equal at any time
+    val diffTlbFillIdxSync = Module(new DifftestLa32rTlbFillIndexSet)
+    diffTlbFillIdxSync.io.clock := clock
+    diffTlbFillIdxSync.io.coreid := 0.U
+    diffTlbFillIdxSync.io.valid := tlbModifyValid && tlbModifyOp === La32rCSROpType.tlbfill
+    diffTlbFillIdxSync.io.index := tlbFillIdx
+
+    (0 until tlbEntryNum).foreach{ i =>
+      val diffTlbEntry = Module(new DifftestLa32rTlbEntry)
+      diffTlbEntry.io.clock := clock
+      diffTlbEntry.io.index := i.U
+      diffTlbEntry.io.coreid := 0.U
+      diffTlbEntry.io.entryhi := tlbEntrys(i).tlbhi.asUInt()
+      diffTlbEntry.io.entrylo0 := tlbEntrys(i).tlblo0.asUInt()
+      diffTlbEntry.io.entrylo1 := tlbEntrys(i).tlblo1.asUInt()
+    }
   }
 
 

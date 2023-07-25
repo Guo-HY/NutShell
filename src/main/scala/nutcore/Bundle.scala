@@ -93,6 +93,7 @@ class CommitIO extends NutCoreBundle {
   val commits = Output(Vec(FuType.num, UInt(XLEN.W)))
   val storeCheck = new StoreCheckIO
   val difftestExceptionSkip = Output(Bool()) // for interrupt difftest align
+  val tlbModifyInst = Output(Bool())
 }
 
 class OOCommitIO extends NutCoreBundle with HasBackendConst{

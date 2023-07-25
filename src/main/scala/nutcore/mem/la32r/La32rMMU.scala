@@ -14,6 +14,7 @@ case class La32rMMUConfig (
   name: String = "mmu",
   userBits: Int = 0,
   tlbEntryNum: Int = 32,
+  FPGAPlatform : Boolean
 )
 
 trait HasLa32rMMUConst {

@@ -495,11 +495,12 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   BoringUtils.addSource(TLBELO1.asUInt(), "TLBELO1")
   BoringUtils.addSource(TLBIDX.asUInt(), "TLBIDX")
   BoringUtils.addSource(ESTAT.asUInt(), "ESTAT")
+  BoringUtils.addSource(io.cfIn.pc, "tlbDebugPC")
 
-  tlbModifyValid := valid && func === La32rCSROpType.tlbwr || func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb
+  tlbModifyValid := valid && (func === La32rCSROpType.tlbwr || func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb)
   tlbModifyOp := func
 
-  val csrtlb = La32rTLB()(La32rMMUConfig(name = "csr", tlbEntryNum = Settings.getInt("TlbEntryNum")))
+  val csrtlb = La32rTLB()(La32rMMUConfig(name = "csr", tlbEntryNum = Settings.getInt("TlbEntryNum"),FPGAPlatform = p.FPGAPlatform ))
   csrtlb.io.in.valid := valid && (func === La32rCSROpType.tlbsrch || func === La32rCSROpType.tlbrd)
   csrtlb.io.in.bits.vaddr := TLBEHI.asUInt()
   csrtlb.io.in.bits.memAccessMaster := 0.U
@@ -533,6 +534,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
       }
       TLBIDX.PS := readtlbhi.ps
       TLBIDX.NE := 0.U
+      ASID.ASID := readtlbhi.asid
     }.otherwise {
       TLBIDX.NE := 1.U
       ASID.ASID := 0.U
@@ -709,6 +711,8 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
   }
   io.difftestExceptionSkip := io.instrValid && raiseException && excptionNO === INT.U
+
+  io.tlbModifyInst := valid && func === La32rCSROpType.tlbwr || func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb
 
   // dirty implement to pass firrtl compile
   val mtip = WireInit(false.B)
