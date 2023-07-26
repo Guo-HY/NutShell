@@ -509,6 +509,21 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
   val exceptionEntry = Mux(excptionNO === TLBR.U, TLBRENTRY, EENTRY)
 
+  // idle
+  val isIdle = valid && func === La32rCSROpType.idle && CRMD.PLV === 0.U
+  val isInIdle = RegInit(false.B)
+  val idlePC = RegInit(0.U(XLEN.W))
+
+  when(isIdle) {
+    isInIdle := true.B
+    idlePC := io.cfIn.pc
+  }
+
+  when(raiseException && excptionNO === INT.U && isInIdle) {
+    isInIdle := false.B
+    ERA := idlePC + 4.U
+  }
+
   // mmu
   BoringUtils.addSource(CRMD.asUInt(), "CRMD")
   BoringUtils.addSource(DMW0.asUInt(), "DMW0")
@@ -587,9 +602,9 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   // NOTE : for brevity, make all csr related inst redirect
   val hasSideEffectOp = valid //&& (func === La32rCSROpType.csrwr || func === La32rCSROpType.csrxchg)
 
-  io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp
+  io.redirect.valid := raiseException | retFromExcp | hasSideEffectOp | isIdle
   io.redirect.rtype := 0.U // TODO : what is this
-  io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, exceptionEntry, io.cfIn.pc + 4.U))
+  io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, exceptionEntry, Mux(isIdle, io.cfIn.pc, io.cfIn.pc + 4.U)))
 
 
   io.in.ready := true.B
