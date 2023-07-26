@@ -59,7 +59,10 @@ cputest_list = ["add-longlong",
 ]
 
 misctest_dir = os.path.join(AM_HOME, "tests/misctest/build")
-misctest_list = ["csr-read-write", "tlb-read-write"]
+misctest_list = ["csr-read-write", "tlb-read-write", "ibar-test", "dbar-test", "preld-test"]
+
+nscscc_func_test_dir = os.path.join(AM_HOME, "tests/chiplabtest/build")
+nscscc_func_test_list = ["chiplabfunc.bin"]
 
 apps_dir = os.path.join(AM_HOME, "apps")
 apps_list = [
@@ -126,6 +129,14 @@ for tp in misctest_list:
     tp_path = os.path.join(misctest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
     run_single_test(tp_path)
 logging.debug("all misctest pass")
+
+# nscscc func test
+nscscc_func_test_num = len(nscscc_func_test_list)
+logging.debug("begin nscscc func test")
+for tp in nscscc_func_test_list:
+    tp_path = os.path.join(nscscc_func_test_dir, tp)
+    run_single_test(tp_path)
+logging.debug("all nscscc func test pass")
 
 # apps
 logging.debug("begin apps test")
