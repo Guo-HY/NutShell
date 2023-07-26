@@ -58,6 +58,9 @@ cputest_list = ["add-longlong",
                 "wanshu",
 ]
 
+misctest_dir = os.path.join(AM_HOME, "tests/misctest/build")
+misctest_list = ["csr-read-write", "tlb-read-write"]
+
 apps_dir = os.path.join(AM_HOME, "apps")
 apps_list = [
     "coremark",
@@ -114,6 +117,15 @@ for tp in cputest_list:
     tp_path = os.path.join(cputest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
     run_single_test(tp_path)
 logging.debug("all cputest pass")
+
+# misctest
+misctestnum = len(misctest_list)
+logging.debug("begin misctest")
+
+for tp in misctest_list:
+    tp_path = os.path.join(misctest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
+    run_single_test(tp_path)
+logging.debug("all misctest pass")
 
 # apps
 logging.debug("begin apps test")
