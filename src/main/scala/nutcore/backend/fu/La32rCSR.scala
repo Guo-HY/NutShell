@@ -356,9 +356,25 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   }
 
   // LLBit ctrl
+  val setllbit = WireInit(false.B)
+  val clearllbit = WireInit(false.B)
+
   when (wen && addr === LLBCTLaddr.U && wdata(1) === 1.U) {
     LLBCTL.ROLLB := 0.U
   }
+
+  when (setllbit) {
+    LLBCTL.ROLLB := 1.U
+  }
+
+  when (clearllbit) {
+    LLBCTL.ROLLB := 0.U
+  }
+
+  BoringUtils.addSink(setllbit, "SET_LLBIT")
+  BoringUtils.addSink(clearllbit, "CLEAR_LLBIT")
+  BoringUtils.addSource(LLBCTL.ROLLB, "LLBIT")
+
 
   // cacop
   val cacopCode = io.cfIn.instr(4, 0)
