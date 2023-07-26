@@ -126,9 +126,6 @@ object LA32R_PRIVInstr extends HasLa32rInstrType with HasNutCoreParameter {
 }
 
 object LA32R_MISCInstr extends HasLa32rInstrType with HasNutCoreParameter {
-  def CACOP     = BitPat("b0 0 0 0 0 1 1 0 0 0_????????????_?????_?????")
-
-  def IDLE      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 1_???????????????")
 
   def PRELD     = BitPat("b0 0 1 0 1 0 1 0 1 1_????????????_?????_?????")
   def DBAR      = BitPat("b0 0 1 1 1 0 0 0 0 1 1 1 0 0 1 0 0_???????????????")
@@ -151,6 +148,8 @@ object LA32R_CSRInstr extends HasLa32rInstrType with HasNutCoreParameter {
   def TLBWR = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 0_0 0 0 0 0_0 0 0 0 0")
   def TLBFILL = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 0 0 1 1 0 1_0 0 0 0 0_0 0 0 0 0")
   def INVTLB = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 1 1_?????_?????_?????")
+  def CACOP     = BitPat("b0 0 0 0 0 1 1 0 0 0_????????????_?????_?????")
+  def IDLE      = BitPat("b0 0 0 0 0 1 1 0 0 1 0 0 1 0 0 0 1_???????????????")
 
   val table = Array(// (instrType, FuType, FuOpType, isrfWen)
     CSR     -> List(Instr2R, FuType.csr, La32rCSROpType.csracc, true.B),
@@ -165,5 +164,7 @@ object LA32R_CSRInstr extends HasLa32rInstrType with HasNutCoreParameter {
     TLBWR   -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbwr, false.B),
     TLBFILL -> List(InstrCODE15, FuType.csr, La32rCSROpType.tlbfill, false.B),
     INVTLB  -> List(Instr3R, FuType.csr, La32rCSROpType.invtlb, false.B),
+    CACOP   -> List(Instr2R, FuType.csr, La32rCSROpType.cacop, false.B),
+    IDLE    -> List(InstrCODE15, FuType.csr, La32rCSROpType.idle, false.B),
   )
 }

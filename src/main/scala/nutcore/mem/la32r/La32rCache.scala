@@ -104,6 +104,15 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
 
   io.out.coh := DontCare
 
+  val cacopValid = WireInit(false.B)
+  val cacopCode = WireInit(0.U(5.W))
+  val cacopVA = WireInit(0.U(VAddrBits.W))
+  val cacopPA = WireInit(0.U(PAddrBits.W))
+  BoringUtils.addSink(cacopValid, "CACOP_VALID")
+  BoringUtils.addSink(cacopCode, "CACOP_CODE")
+  BoringUtils.addSink(cacopVA, "CACOP_VA")
+  BoringUtils.addSink(cacopPA, "CACOP_PA")
+
   Debug(io.in.req.fire(), p"in.req: ${io.in.req.bits}\n")
   Debug(io.out.mem.req.fire(), p"out.mem.req: ${io.out.mem.req.bits}\n")
   Debug(io.out.mem.resp.fire(), p"out.mem.resp: ${io.out.mem.resp.bits}\n")

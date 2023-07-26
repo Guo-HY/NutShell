@@ -1,5 +1,6 @@
 package nutcore
 
+import bus.simplebus.{SimpleBusCmd, SimpleBusUC}
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
@@ -223,7 +224,7 @@ trait HasLa32rExceptionNO {
 
 }
 
-class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst with HasLa32rTLBConst {
+class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with HasLa32rCSRConst with HasLa32rTLBConst with HasMemAccessMaster {
   assert(XLEN == 32)
 
   // reg define
@@ -361,6 +362,41 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
   // cacop
   val cacopCode = io.cfIn.instr(4, 0)
+  val isCacop = valid && (func === La32rCSROpType.cacop)
+  val cacopVA = SignExt(io.cfIn.instr(21, 10), XLEN) + src1
+  val cacopPA = WireInit(0.U(PAddrBits.W))
+  val isHitCacop = isCacop && (cacopCode(4, 3) === 2.U)
+  val isIndexCacop = isCacop && (cacopCode(4, 3) === 1.U)
+  val isStoreTagCacop = isCacop && (cacopCode(4, 3) === 0.U)
+
+  BoringUtils.addSource(cacopCode, "CACOP_CODE")
+  BoringUtils.addSource(isCacop, "CACOP_VALID")
+  BoringUtils.addSource(cacopVA, "CACOP_VA")
+  BoringUtils.addSource(cacopPA, "CACOP_PA")
+
+  val cacopUserBits = Wire(new ImmuUserBundle)
+  val cacopmmuIn = Wire(new SimpleBusUC(userBits = immuUserBits, addrBits = VAddrBits))
+  val cacopmmu = La32rMMU(in = cacopmmuIn, enable = true)(La32rMMUConfig(name = "immu", userBits = immuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
+
+  cacopUserBits.pc := 0.U
+  cacopUserBits.npc := 0.U
+  cacopUserBits.brIdx := 0.U
+  cacopUserBits.memAccessMaster := LOAD
+  cacopUserBits.tlbExcp := 0.U.asTypeOf(cacopUserBits.tlbExcp)
+
+  cacopmmuIn.req.valid := isHitCacop
+  cacopmmuIn.req.bits.apply(addr = cacopVA, size = "b00".U, cmd=SimpleBusCmd.read, wdata = 0.U, wmask=0.U, user = cacopUserBits.asUInt())
+  cacopmmuIn.resp.ready := true.B
+
+  cacopmmu.io.out.req.ready := true.B
+  cacopmmu.io.out.resp.valid := false.B
+  cacopmmu.io.out.resp.bits.rdata := 0.U
+  cacopmmu.io.out.resp.bits.cmd := 0.U
+  cacopmmu.io.out.resp.bits.user.foreach(_ := 0.U)
+
+  cacopPA := cacopmmu.io.out.req.bits.addr
+  val hitCacopTlbExcpTmp = cacopmmu.io.out.req.bits.user.get.asTypeOf(new ImmuUserBundle).tlbExcp
+  val hitCacopTlbExcp = (hitCacopTlbExcpTmp.asUInt() & Fill(hitCacopTlbExcpTmp.asUInt().getWidth, isHitCacop)).asTypeOf(hitCacopTlbExcpTmp)
 
 
   // Exception & interrupt
@@ -393,11 +429,11 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
     func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb || func === La32rCSROpType.ertn
     || func === La32rCSROpType.idle)
   csrExceptionVec(IPE) := isPrivInst && CRMD.PLV === 3.U
-  csrExceptionVec(TLBR) := io.la32rLSUExcp.tlbExcp.tlbRefillExcp
-  csrExceptionVec(PIL) := io.la32rLSUExcp.tlbExcp.loadPageInvalidExcp
+  csrExceptionVec(TLBR) := io.la32rLSUExcp.tlbExcp.tlbRefillExcp || hitCacopTlbExcp.tlbRefillExcp
+  csrExceptionVec(PIL) := io.la32rLSUExcp.tlbExcp.loadPageInvalidExcp || hitCacopTlbExcp.loadPageInvalidExcp
   csrExceptionVec(PIS) := io.la32rLSUExcp.tlbExcp.storePageInvalidExcp
-  csrExceptionVec(PPI) := io.la32rLSUExcp.tlbExcp.pagePrivInvalidExcp
-  csrExceptionVec(PME) := io.la32rLSUExcp.tlbExcp.pageModifyExcp
+  csrExceptionVec(PPI) := io.la32rLSUExcp.tlbExcp.pagePrivInvalidExcp || hitCacopTlbExcp.pagePrivInvalidExcp
+  csrExceptionVec(PME) := io.la32rLSUExcp.tlbExcp.pageModifyExcp || hitCacopTlbExcp.pageModifyExcp
   csrExceptionVec(INE) := valid && func === La32rCSROpType.invtlb && io.cfIn.instr(4, 0) > 6.U
 
   val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, io.instrValid)) | csrExceptionVec.asUInt
@@ -441,12 +477,12 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
 
     when ((excptionNO === ADEF.U) || (excptionNO === TLBR.U && io.cfIn.exceptionVec(TLBR)) ||
       (excptionNO === PIF.U) || (excptionNO === PPI.U && io.cfIn.exceptionVec(PPI))) {
-      BADV := io.cfIn.pc
       badvWrite := io.cfIn.pc
+      BADV := badvWrite
     }.elsewhen((excptionNO === TLBR.U) || (excptionNO === ALE.U) || (excptionNO === PIL.U) || (excptionNO === PIS.U)
       || (excptionNO === PME.U) || (excptionNO === PPI.U)) {
-      BADV := io.la32rLSUExcp.badv
-      badvWrite := io.la32rLSUExcp.badv
+      badvWrite := Mux(isHitCacop, cacopVA, io.la32rLSUExcp.badv)
+      BADV := badvWrite
     }
 
     when((excptionNO === TLBR.U) || (excptionNO === PIL.U) || (excptionNO === PIS.U) || (excptionNO === PIF.U) ||
