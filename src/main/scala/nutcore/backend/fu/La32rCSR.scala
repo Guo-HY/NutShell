@@ -27,6 +27,7 @@ object La32rCSROpType {
   def tlbfill = 16.U
   def invtlb = 17.U // src1 = rj ,src2 = rk
   def idle = 18.U
+  def preld = 19.U
 
 }
 
@@ -538,6 +539,12 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   when(raiseException && excptionNO === INT.U && isInIdle) {
     isInIdle := false.B
     ERA := idlePC + 4.U
+  }
+
+  // preld
+  val isPreld = valid && func === La32rCSROpType.preld
+  when (isPreld) {
+    printf("detected preld instr at pc=0x%x\n", io.cfIn.pc)
   }
 
   // mmu

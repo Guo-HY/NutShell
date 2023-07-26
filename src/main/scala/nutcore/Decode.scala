@@ -111,5 +111,5 @@ object La32rInstructions extends HasLa32rInstrType with HasNutCoreParameter {
   def NOP = "b0000001101_000000000000_00000_00000".U // andi r0, r0, 0
   val DecodeDefault = List(InstrN, FuType.csr, La32rCSROpType.excption, false.B)
   def DecodeTable = LA32R_ALUInstr.table ++ LA32R_BRUInstr.table ++
-    LA32R_LSUInstr.table ++ LA32R_CSRInstr.table ++ LA32R_MDUInstr.table
+    LA32R_LSUInstr.table ++ LA32R_CSRInstr.table ++ LA32R_MDUInstr.table ++ LA32R_MOUInstr.table
 }

@@ -113,6 +113,40 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
   BoringUtils.addSink(cacopVA, "CACOP_VA")
   BoringUtils.addSink(cacopPA, "CACOP_PA")
 
+  // ibar
+  val flushICache = WireInit(false.B)
+  val flushDCache = WireInit(false.B)
+  val dcacheFlushDone = WireInit(false.B)
+  val icacheFlushDone = WireInit(false.B)
+  BoringUtils.addSink(flushICache, "FLUSH_ICACHE")
+  BoringUtils.addSink(flushDCache, "FLUSH_DCACHE")
+  if (cacheName == "icache") {
+    BoringUtils.addSource(icacheFlushDone, "ICACHE_FLUSH_DONE")
+  } else {
+    BoringUtils.addSource(dcacheFlushDone, "DCACHE_FLUSH_DONE")
+  }
+
+  val flush = Mux((cacheName == "icache").asBool(), flushICache, flushDCache)
+  val s_flush_idle :: s_flush_doing :: s_flush_done :: Nil = Enum(3)
+  val flush_state = RegInit(s_flush_idle)
+  val flush_counter = RegInit(0.U(5.W))
+  switch (flush_state) {
+    is (s_flush_idle) {
+      when (flush) {
+        flush_state := s_flush_doing
+        flush_counter := 0.U
+      }
+    }
+    is (s_flush_doing) {
+      flush_counter := flush_counter + 1.U // just for simulate flush time delay
+      when (flush_counter === 16.U) { flush_state := s_flush_done }
+    }
+    is (s_flush_done) { flush_state := s_flush_idle }
+  }
+  dcacheFlushDone := flush_state === s_flush_done
+  icacheFlushDone := flush_state === s_flush_done
+
+
   Debug(io.in.req.fire(), p"in.req: ${io.in.req.bits}\n")
   Debug(io.out.mem.req.fire(), p"out.mem.req: ${io.out.mem.req.bits}\n")
   Debug(io.out.mem.resp.fire(), p"out.mem.resp: ${io.out.mem.resp.bits}\n")

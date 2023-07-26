@@ -86,7 +86,7 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   csr.io.imemMMU <> io.memMMU.imem
   csr.io.dmemMMU <> io.memMMU.dmem
 
-  val mou = Module(new MOU)
+  val mou = if (IsLa32r) Module(new La32rMOU()) else Module(new MOU)
   // mou does not write register
   mou.access(valid = fuValids(FuType.mou), src1 = src1, src2 = src2, func = fuOpType)
   mou.io.cfIn := io.in.bits.cf
@@ -116,7 +116,8 @@ class EXU(implicit val p: NutCoreConfig) extends NutCoreModule {
   // TODO : may has perf bug
   io.out.valid := io.in.valid && MuxLookup(fuType, true.B, List(
     FuType.lsu -> lsu.io.out.valid,
-    FuType.mdu -> mdu.io.out.valid
+    FuType.mdu -> mdu.io.out.valid,
+    FuType.mou -> mou.io.out.valid,
   ))
 
   io.out.bits.commits(FuType.alu) := aluOut
