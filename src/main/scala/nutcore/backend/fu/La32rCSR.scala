@@ -89,8 +89,8 @@ trait HasLa32rCSRConst {
 
   val timerWidth = 32
 
-  val CoherentCached = 0.U
-  val StronglyOrderedUncached = 1.U
+  val CoherentCached = 1.U
+  val StronglyOrderedUncached = 0.U
 
   // csr struct define
   class CRMDStruct extends Bundle {
