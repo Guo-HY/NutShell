@@ -46,6 +46,7 @@ trait HasNutCoreParameter {
     val brIdx =  Output(UInt(4.W))
     val memAccessMaster = Output(UInt(2.W))
     val tlbExcp = new La32rTLBExcpIO
+    val mat = Output(UInt(2.W))
   }
   class DmmuUserBundle extends Bundle {
     val isDeviceLoad = Output(UInt(1.W))
@@ -53,6 +54,7 @@ trait HasNutCoreParameter {
     val tlbExcp = new La32rTLBExcpIO
     val paddr = Output(UInt(32.W))
     val isInvalidPaddr = Output(Bool())
+    val mat = Output(UInt(2.W))
   }
   val immuUserBits = (new ImmuUserBundle).getWidth
   val dmmuUserBits = (new DmmuUserBundle).getWidth

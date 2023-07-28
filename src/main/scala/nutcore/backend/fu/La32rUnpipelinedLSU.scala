@@ -103,6 +103,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   reqUserBits.tlbExcp := 0.U.asTypeOf(reqUserBits.tlbExcp)
   reqUserBits.paddr := 0.U
   reqUserBits.isInvalidPaddr := false.B
+  reqUserBits.mat := 0.U
 
   dmem.req.bits.apply(
     addr = vaddr,

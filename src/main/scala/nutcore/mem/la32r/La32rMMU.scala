@@ -30,7 +30,6 @@ trait HasLa32rMMUIO extends HasNutCoreParameter with HasLa32rMMUConst {
   class La32rMMUIO extends Bundle {
     val in = Flipped(new SimpleBusUC(userBits = userBits, addrBits = VAddrBits))
     val out = new SimpleBusUC(userBits = userBits, addrBits = PAddrBits)
-    val memoryAccessType = Output(UInt(2.W))
   }
   val io = IO(new La32rMMUIO)
 }
@@ -85,12 +84,13 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
 
 
   io.out.req.bits.addr := Mux(isDAT, DATPaddr,Mux(isDMAT, DMATPaddr, TLBPaddr))
-  io.memoryAccessType := Mux(isDAT, DATMAT,Mux(isDMAT, DMATMAT, TLBMAT))
+  val memoryAccessType = Mux(isDAT, DATMAT,Mux(isDMAT, DMATMAT, TLBMAT))
 
   if (mmuname == "immu") {
     val immuUserBits = Wire(new ImmuUserBundle)
     immuUserBits := io.in.req.bits.user.get.asTypeOf(new ImmuUserBundle)
     immuUserBits.tlbExcp := tlbExcp
+    immuUserBits.mat := memoryAccessType
     io.out.req.bits.user.map(_ := immuUserBits.asUInt())
   } else {
     val dmmuUserBits = Wire(new DmmuUserBundle)
@@ -99,6 +99,7 @@ class La32rMMU(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
     dmmuUserBits.isDeviceLoad := io.in.req.bits.cmd === SimpleBusCmd.read && DeviceSpace.isDevice(io.out.req.bits.addr)
     dmmuUserBits.paddr := io.out.req.bits.addr
     dmmuUserBits.isInvalidPaddr := !PMA.isValidAddr(io.out.req.bits.addr)
+    dmmuUserBits.mat := memoryAccessType
     io.out.req.bits.user.map(_ := dmmuUserBits.asUInt())
   }
 
@@ -117,7 +118,6 @@ class La32rMMU_fake(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCore
   BoringUtils.addSink(ASID, "ASID")
 
   io.out <> io.in
-  io.memoryAccessType := 0.U
 }
 
 object La32rMMU {

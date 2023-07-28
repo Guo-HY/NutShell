@@ -10,7 +10,8 @@ import top.Settings
 
 class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle() {
-    val mem = new SimpleBusUC(addrBits = PAddrBits)
+    val cachedMem = new SimpleBusUC(addrBits = PAddrBits)
+    val uncachedMem = new SimpleBusUC(addrBits = PAddrBits)
   })
 
   println("dmmuUserBits=", dmmuUserBits)
@@ -22,20 +23,22 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   PipelineVector2Connect(new DecodeIO, frontend.io.out(0), frontend.io.out(1), backend.io.in(0), backend.io.in(1), frontend.io.flushVec(1), 4)
 
-  val memXbar = Module(new SimpleBusCrossbarNto1(4))
+  val cachedXbar = Module(new SimpleBusCrossbarNto1(2))
+  val uncachedXbar = Module(new SimpleBusCrossbarNto1(2))
 
   val immu = La32rMMU(in = frontend.io.imem, enable = HasIMMU)(La32rMMUConfig(name = "immu", userBits = immuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val icache = La32rCache(in = immu.io.out, mmio = memXbar.io.in(2), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), mat = immu.io.memoryAccessType, enable = HasIcache)(CacheConfig(ro = true, name = "icache", userBits = immuUserBits))
+  val icache = La32rCache(in = immu.io.out, mmio = uncachedXbar.io.in(1), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), enable = HasIcache)(CacheConfig(ro = true, name = "icache", userBits = immuUserBits))
 
   val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val dcache = La32rCache(in = dmmu.io.out, mmio = memXbar.io.in(0), flush = "b00".U, mat = dmmu.io.memoryAccessType, enable = HasDcache)(CacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits))
+  val dcache = La32rCache(in = dmmu.io.out, mmio = uncachedXbar.io.in(0), flush = "b00".U, enable = HasDcache)(CacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits))
 
-  memXbar.io.in(1) <> dcache.io.out.mem
-  memXbar.io.in(3) <> icache.io.out.mem
+  cachedXbar.io.in(0) <> dcache.io.out.mem
+  cachedXbar.io.in(1) <> icache.io.out.mem
 
-  io.mem <> memXbar.io.out
+  io.cachedMem <> cachedXbar.io.out
+  io.uncachedMem <> uncachedXbar.io.out
 
   icache.io.out.coh <> DontCare
   dcache.io.out.coh <> DontCare

@@ -48,13 +48,19 @@ class SimTop extends Module  {
     (Settings.getLong("RAMBase"), Settings.getLong("RAMSize")),
   )
 
-  val memXbar = Module(new SimpleBusCrossbar1toN(addrSpace))
-  memXbar.io.in <> core.io.mem
+  val deviceXbar = Module(new SimpleBusCrossbar1toN(addrSpace))
+  val ramXbar = Module(new SimpleBusCrossbarNto1(2))
 
-  memdelay.io.in <> memXbar.io.out(1).toAXI4()
+  deviceXbar.io.in <> core.io.uncachedMem
+
+  ramXbar.io.in(0) <> core.io.cachedMem
+  ramXbar.io.in(1) <> deviceXbar.io.out(1)
+
+  memdelay.io.in <> ramXbar.io.out.toAXI4(isFromCache = true)
   mem.io.in <> memdelay.io.out
 
-  confreg.io.in <> memXbar.io.out(0).toAXI4Lite()
+  confreg.io.in <> deviceXbar.io.out(0).toAXI4Lite()
+
 
   val log_begin, log_end, log_level = WireInit(0.U(64.W))
   log_begin := io.logCtrl.log_begin

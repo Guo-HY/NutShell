@@ -17,7 +17,7 @@ trait HasLa32rCacheIO {
     val flush = Input(UInt(2.W))
     val out = new SimpleBusC
     val mmio = new SimpleBusUC
-    val mat = Input(UInt(2.W))
+//    val mat = Input(UInt(2.W))
   }
   val io = IO(new La32rCacheIO())
 }
@@ -27,7 +27,16 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
   val s_idle :: s_memReq :: s_memResp :: s_mmioReq :: s_mmioResp :: s_wait_resp :: Nil = Enum(6)
   val state = RegInit(s_idle)
 
-  val ismmio = io.mat === StronglyOrderedUncached
+  val memuser = RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
+  io.in.resp.bits.user.zip(if (userBits > 0) Some(memuser) else None).map { case (o, i) => o := i }
+
+  val ismmio = WireInit(false.B)
+  if (cacheName == "icache") {
+    ismmio := io.in.req.bits.user.get.asTypeOf(new ImmuUserBundle).mat === StronglyOrderedUncached
+  } else {
+    ismmio := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle).mat === StronglyOrderedUncached
+  }
+
   val ismmioRec = RegEnable(ismmio, io.in.req.fire())
 
   val hasTlbExcp = WireInit(false.B)
@@ -81,8 +90,6 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
   io.in.resp.bits.rdata := Mux(ismmioRec, mmiordata, memrdata)
   io.in.resp.bits.cmd := Mux(ismmioRec, mmiocmd, memcmd)
 
-  val memuser = RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
-  io.in.resp.bits.user.zip(if (userBits > 0) Some(memuser) else None).map { case (o,i) => o := i }
 
   if (cacheName == "icache") {
     hasTlbExcp := memuser.asTypeOf(new ImmuUserBundle).tlbExcp.asUInt().orR
@@ -154,13 +161,12 @@ class La32rCache_fake(implicit val cacheConfig: CacheConfig) extends CacheModule
 }
 
 object La32rCache {
-  def apply(in: SimpleBusUC, mmio: SimpleBusUC, flush: UInt, mat: UInt, enable: Boolean = false)(implicit cacheConfig: CacheConfig) = {
+  def apply(in: SimpleBusUC, mmio: SimpleBusUC, flush: UInt, enable: Boolean = false)(implicit cacheConfig: CacheConfig) = {
     assert(enable == false)
     val cache = Module(new La32rCache_fake())
     cache.io.in <> in
     cache.io.flush := flush
     mmio <> cache.io.mmio
-    cache.io.mat := mat
     cache
   }
 }

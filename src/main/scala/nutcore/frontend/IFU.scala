@@ -293,6 +293,7 @@ class IFU_embedded extends NutCoreModule with HasResetVector with HasMemAccessMa
   reqUserBits.brIdx := Mux(io.redirect.valid, 0.U, Cat(0.U(3.W), bpu.io.out.valid))
   reqUserBits.memAccessMaster := FETCH
   reqUserBits.tlbExcp := 0.U.asTypeOf(reqUserBits.tlbExcp)
+  reqUserBits.mat := 0.U
 
   io.imem := DontCare
   io.imem.req.bits.apply(addr = pc, size = "b10".U, cmd = SimpleBusCmd.read, wdata = 0.U, wmask = 0.U, user = reqUserBits.asUInt())

@@ -400,6 +400,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   cacopUserBits.brIdx := 0.U
   cacopUserBits.memAccessMaster := LOAD
   cacopUserBits.tlbExcp := 0.U.asTypeOf(cacopUserBits.tlbExcp)
+  cacopUserBits.mat := 0.U
 
   cacopmmuIn.req.valid := isHitCacop
   cacopmmuIn.req.bits.apply(addr = cacopVA, size = "b00".U, cmd=SimpleBusCmd.read, wdata = 0.U, wmask=0.U, user = cacopUserBits.asUInt())
