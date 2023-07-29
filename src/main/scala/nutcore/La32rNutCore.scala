@@ -28,11 +28,11 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   val immu = La32rMMU(in = frontend.io.imem, enable = HasIMMU)(La32rMMUConfig(name = "immu", userBits = immuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val icache = La32rCache(in = immu.io.out, mmio = uncachedXbar.io.in(1), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), enable = HasIcache)(CacheConfig(ro = true, name = "icache", userBits = immuUserBits))
+  val icache = La32rCache(in = immu.io.out, mmio = uncachedXbar.io.in(1), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), enable = HasIcache)(La32rCacheConfig(ro = true, name = "icache", userBits = immuUserBits, totalSize = 1))
 
   val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val dcache = La32rCache(in = dmmu.io.out, mmio = uncachedXbar.io.in(0), flush = "b00".U, enable = HasDcache)(CacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits))
+  val dcache = La32rCache(in = dmmu.io.out, mmio = uncachedXbar.io.in(0), flush = "b00".U, enable = HasDcache)(La32rCacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits, totalSize = 1))
 
   cachedXbar.io.in(0) <> dcache.io.out.mem
   cachedXbar.io.in(1) <> icache.io.out.mem
