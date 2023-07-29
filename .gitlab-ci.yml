@@ -1,0 +1,80 @@
+stages:
+  - build-emu
+  - func-tests
+  - app-tests
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+
+default:
+  before_script:
+    - export NOOP_HOME=$CI_PROJECT_DIR
+    - export NUTSHELL_HOME=$NOOP_HOME
+    - export DEPS_HOME=$NOOP_HOME/deps
+    - export NEMU_PROJECT_HOME=$DEPS_HOME/nemu
+    - export NEMU_HOME=$NEMU_PROJECT_HOME/NEMU
+    - export AM_HOME=$DEPS_HOME/am
+    - export LA32RTC_HOME=$DEPS_HOME/la32r-toolchains
+    - export PATH=$PATH:$LA32RTC_HOME/loongarch32r-linux-gnusf-2022-05-20/bin
+    - mkdir -p $DEPS_HOME
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ci-lab.net/eula/la32r-toolchains.git --recursive $LA32RTC_HOME
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ci-lab.net/eula/am.git --recursive $AM_HOME
+
+
+build-emu:
+  stage: build-emu
+  script:
+    - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ci-lab.net/eula/nemu.git --recursive $NEMU_PROJECT_HOME
+    - make -C $NEMU_HOME la32-reduced-ref_defconfig && make -C $NEMU_HOME
+    - make emu
+  artifacts:
+    paths:
+      - ./build/emu
+      - ./deps/nemu/NEMU/build/la32r-nemu-interpreter-so
+
+cputest:
+  stage: func-tests
+  variables:
+    ARCH: la32r-nutshell
+  script:
+    - make -C $AM_HOME/tests/cputest
+    - >
+      for case in $(find $AM_HOME/tests/cputest/build -name '*.bin'); do
+        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+      done
+
+misctest:
+  stage: func-tests
+  variables:
+    ARCH: la32r-nutshell
+  script:
+    - make -C $AM_HOME/tests/misctest
+    - >
+      for case in $(find $AM_HOME/tests/misctest/build -name '*.bin'); do
+        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+      done
+
+chiplabtest:
+  stage: func-tests
+  variables:
+    ARCH: la32r-nutshell
+  script:
+    - make -C $AM_HOME/tests/chiplabtest
+    - >
+      for case in $(find $AM_HOME/tests/chiplabtest/build -name '*.bin'); do
+        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+      done
+
+apps:
+  stage: app-tests
+  variables:
+    ARCH: la32r-nutshell
+  parallel:
+    matrix:
+      - APP: [coremark, dhrystone, microbench]
+  script:
+    - make -C $AM_HOME/apps/$APP
+    - >
+      for case in $(find $AM_HOME/apps/$APP/build -name '*.bin'); do
+        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+      done
