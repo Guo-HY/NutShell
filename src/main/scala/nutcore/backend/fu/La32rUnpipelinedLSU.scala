@@ -64,11 +64,14 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   val holdInstr = HoldUnless(io.instr, io.in.fire)
 
   val llscvaddr = holdSrc1 + SignExt(Cat(holdInstr(23 ,10), 0.U(2.W)), VAddrBits)
-  val vaddr = Mux(func === La32rLSUOpType.llw || func === La32rLSUOpType.scw, llscvaddr, holdSrc1 + holdSrc2)
+  val vaddr = Mux(holdFunc === La32rLSUOpType.llw || holdFunc === La32rLSUOpType.scw, llscvaddr, holdSrc1 + holdSrc2)
   val dmem = io.dmem
   val isStore = La32rLSUOpType.isStore(holdFunc)
   val partialLoad = La32rLSUOpType.isLoad(holdFunc) && (holdFunc =/= La32rLSUOpType.lw) && (holdFunc =/= La32rLSUOpType.llw)
   val addrAligned = WireInit(false.B)
+  val unHoldAddrAligned = WireInit(false.B)
+  val unHoldVaddr = Mux(func === La32rLSUOpType.llw || func === La32rLSUOpType.scw,
+    src1 + SignExt(Cat(io.instr(23 ,10), 0.U(2.W)), VAddrBits), src1 + src2)
 
   // llbit
   val llbit = WireInit(false.B)
@@ -78,6 +81,7 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
   BoringUtils.addSource(setllbit, "SET_LLBIT")
   BoringUtils.addSource(clearllbit, "CLEAR_LLBIT")
   val scwAllow = (holdFunc =/= La32rLSUOpType.scw) || (holdFunc === La32rLSUOpType.scw && llbit === 1.U)
+  val unHoldScwAllow = (func =/= La32rLSUOpType.scw) || (func === La32rLSUOpType.scw && llbit === 1.U)
   // ll.w set llbit
   setllbit := io.out.fire() && holdFunc === La32rLSUOpType.llw && !io.la32rExcp.hasExcp
   clearllbit := io.out.fire() && holdFunc === La32rLSUOpType.scw && !io.la32rExcp.hasExcp && llbit === 1.U
@@ -113,12 +117,12 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     cmd = Mux(isStore, SimpleBusCmd.write, SimpleBusCmd.read),
     user = reqUserBits.asUInt())
   dmem.req.valid := valid && (state === s_idle) && addrAligned && scwAllow
-  dmem.resp.ready := partialLoad || io.out.ready
+  dmem.resp.ready := true.B //partialLoad || io.out.ready
 
-  io.in.ready := (state === s_idle) && dmem.req.ready
-  io.out.valid := Mux(valid && (!addrAligned || !scwAllow), true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
+  io.in.ready := (state === s_idle) && (dmem.req.ready || !unHoldAddrAligned || !unHoldScwAllow)
+  io.out.valid := Mux(valid && (state === s_idle) && (!addrAligned || !scwAllow), true.B, Mux(partialLoad, state === s_partialLoad, dmem.resp.fire && (state === s_wait_resp)))
 
-  val rdata = dmem.resp.bits.rdata
+  val rdata = HoldUnless(dmem.resp.bits.rdata, dmem.resp.fire)
   val rdataDelay1 = RegNext(rdata)
 
   val rdataSel = LookupTree(vaddr(1, 0), List(
@@ -143,6 +147,12 @@ class La32rUnpipelinedLSU(implicit override val p: NutCoreConfig) extends Abstra
     "b00".U -> true.B,
     "b01".U -> (vaddr(0) === 0.U),
     "b10".U -> (vaddr(1, 0) === 0.U)
+  ))
+
+  unHoldAddrAligned := LookupTree(func(1, 0), List(
+    "b00".U -> true.B,
+    "b01".U -> (unHoldVaddr(0) === 0.U),
+    "b10".U -> (unHoldVaddr(1, 0) === 0.U)
   ))
 
   val respUserBits = HoldUnless(dmem.resp.bits.user.get.asTypeOf(new DmmuUserBundle), dmem.resp.fire)
