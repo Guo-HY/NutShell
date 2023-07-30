@@ -117,6 +117,7 @@ class La32rCacheStage1(implicit val cacheConfig: La32rCacheConfig) extends La32r
     val out = Decoupled(new La32rStage1IO)
     val metaReadBus = CacheMetaArrayReadBus()
     val dataReadBus = CacheDataArrayReadBus()
+    val cacheInvalidStall = Input(Bool())
   }
   val io = IO(new CacheStage1IO)
 
@@ -124,13 +125,13 @@ class La32rCacheStage1(implicit val cacheConfig: La32rCacheConfig) extends La32r
   Debug(io.in.fire(), "[L1$] cache stage1, addr in: %x, user: %x id: %x\n", io.in.bits.addr, io.in.bits.user.getOrElse(0.U), io.in.bits.id.getOrElse(0.U))
 
   // read meta array and data array
-  val readBusValid = io.in.valid && io.out.ready
+  val readBusValid = io.in.valid && io.out.ready && !io.cacheInvalidStall
   io.metaReadBus.apply(valid = readBusValid, setIdx = getMetaIdx(io.in.bits.addr))
   io.dataReadBus.apply(valid = readBusValid, setIdx = getDataIdx(io.in.bits.addr))
 
   io.out.bits.req := io.in.bits
-  io.out.valid := io.in.valid && io.metaReadBus.req.ready && io.dataReadBus.req.ready
-  io.in.ready := io.out.ready && io.metaReadBus.req.ready && io.dataReadBus.req.ready
+  io.out.valid := io.in.valid && io.metaReadBus.req.ready && io.dataReadBus.req.ready && !io.cacheInvalidStall
+  io.in.ready := io.out.ready && io.metaReadBus.req.ready && io.dataReadBus.req.ready && !io.cacheInvalidStall
 
   Debug("in.ready = %d, in.valid = %d, out.valid = %d, out.ready = %d, addr = %x, cmd = %x, dataReadBus.req.valid = %d\n", io.in.ready, io.in.valid, io.out.valid, io.out.ready, io.in.bits.addr, io.in.bits.cmd, io.dataReadBus.req.valid)
 }
@@ -499,20 +500,17 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
   val s1 = Module(new La32rCacheStage1)
   val s2 = Module(new La32rCacheStage2)
   val s3 = Module(new La32rCacheStage3)
-  val metaArray = Module(new SRAMTemplateWithArbiter(nRead = 1, new La32rMetaBundle, set = Sets, way = Ways, shouldReset = true))
-  val dataArray = Module(new SRAMTemplateWithArbiter(nRead = 2, new La32rDataBundle, set = Sets * LineBeats, way = Ways))
+  val metaArray = Module(new SRAMTemplateWithArbiter(nRead = 2, new La32rMetaBundle, set = Sets, way = Ways))
+  val dataArray = Module(new SRAMTemplateWithArbiter(nRead = 3, new La32rDataBundle, set = Sets * LineBeats, way = Ways))
 
-  if (cacheName == "icache") {
-    // flush icache when executing fence.i
-    val flushICache = WireInit(false.B)
-    BoringUtils.addSink(flushICache, "MOUFlushICache")
-    metaArray.reset := reset.asBool || flushICache
-  }
+  val cacheInvalidUnit = if (cacheName == "icache") Module(new ICacheInvalidUnit()) else Module(new DCacheInvalidUnit())
 
   val arb = Module(new Arbiter(new SimpleBusReqBundle(userBits = userBits, idBits = idBits), hasCohInt + 1))
   arb.io.in(hasCohInt + 0) <> io.in.req
 
   s1.io.in <> arb.io.out
+
+  s1.io.cacheInvalidStall := cacheInvalidUnit.io.inprocess
   /*
   val s2BlockByPrefetch = if (cacheLevel == 2) {
       s2.io.out.valid && s3.io.in.valid && s3.io.in.bits.req.isPrefetch() && !s3.io.in.ready
@@ -522,7 +520,12 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
   PipelineConnect(s2.io.out, s3.io.in, s3.io.isFinish, io.flush(1))
   io.in.resp <> s3.io.out
   s3.io.flush := io.flush(1)
-  io.out.mem <> s3.io.mem
+
+  val memXbar = Module(new SimpleBusCrossbarNto1(2))
+  memXbar.io.in(0) <> cacheInvalidUnit.io.mem
+  memXbar.io.in(1) <> s3.io.mem
+  io.out.mem <> memXbar.io.out
+
   io.mmio <> s3.io.mmio
 
   io.in.resp.valid := Mux(s3.io.out.valid && s3.io.out.bits.isPrefetch(), false.B, s3.io.out.valid || s3.io.dataReadRespToL1)
@@ -543,11 +546,17 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
     s3.io.cohResp.ready := true.B
   }
 
-  metaArray.io.r(0) <> s1.io.metaReadBus
-  dataArray.io.r(0) <> s1.io.dataReadBus
-  dataArray.io.r(1) <> s3.io.dataReadBus
+  val metaWriteArb = Module(new Arbiter(CacheMetaArrayWriteBus().req.bits, 2))
 
-  metaArray.io.w <> s3.io.metaWriteBus
+  metaArray.io.r(0) <> cacheInvalidUnit.io.metaReadBus
+  metaArray.io.r(1) <> s1.io.metaReadBus
+  dataArray.io.r(0) <> cacheInvalidUnit.io.dataReadBus
+  dataArray.io.r(1) <> s1.io.dataReadBus
+  dataArray.io.r(2) <> s3.io.dataReadBus
+
+  metaWriteArb.io.in(0) <> cacheInvalidUnit.io.metaWriteBus.req
+  metaWriteArb.io.in(1) <> s3.io.metaWriteBus.req
+  metaArray.io.w.req <> metaWriteArb.io.out
   dataArray.io.w <> s3.io.dataWriteBus
 
   s2.io.metaReadResp := s1.io.metaReadBus.resp.data
@@ -579,29 +588,22 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
     BoringUtils.addSource(dcacheFlushDone, "DCACHE_FLUSH_DONE")
   }
 
-  val flush = Mux((cacheName == "icache").asBool(), flushICache, flushDCache)
-  val s_flush_idle :: s_flush_doing :: s_flush_done :: Nil = Enum(3)
-  val flush_state = RegInit(s_flush_idle)
-  val flush_counter = RegInit(0.U(5.W))
-  switch(flush_state) {
-    is(s_flush_idle) {
-      when(flush) {
-        flush_state := s_flush_doing
-        flush_counter := 0.U
-      }
-    }
-    is(s_flush_doing) {
-      flush_counter := flush_counter + 1.U // just for simulate flush time delay
-      when(flush_counter === 16.U) {
-        flush_state := s_flush_done
-      }
-    }
-    is(s_flush_done) {
-      flush_state := s_flush_idle
-    }
-  }
-  dcacheFlushDone := flush_state === s_flush_done
-  icacheFlushDone := flush_state === s_flush_done
+  val ibarflush = Mux((cacheName == "icache").asBool(), flushICache, flushDCache)
+  val cacopflush = cacopValid & Mux((cacheName == "icache").asBool(), cacopCode(2, 0) === 0.U, cacopCode(2, 0) === 1.U)
+
+  cacheInvalidUnit.io.req.valid := cacopflush || ibarflush
+  cacheInvalidUnit.io.req.bits.isCacop := cacopflush
+  cacheInvalidUnit.io.req.bits.isIbar := ibarflush
+  cacheInvalidUnit.io.req.bits.cacopCode := cacopCode
+  cacheInvalidUnit.io.req.bits.cacopVA := cacopVA
+  cacheInvalidUnit.io.req.bits.cacopPA := cacopPA
+
+  dcacheFlushDone := cacheInvalidUnit.io.done
+  icacheFlushDone := cacheInvalidUnit.io.done
+
+  cacheInvalidUnit.io.cachePipelineClear := true.B // !s2.io.in.valid && !s3.io.in.valid
+
+
 
   if (EnableOutOfOrderExec) {
     BoringUtils.addSource(s3.io.out.fire() && s3.io.in.bits.hit, "perfCntCondM" + cacheName + "Hit")
@@ -615,6 +617,252 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
   when (s2.io.in.valid) { Debug(p"[${cacheName}.S2]: ${s2.io.in.bits.req}\n") }
   when (s3.io.in.valid) { Debug(p"[${cacheName}.S3]: ${s3.io.in.bits.req}\n") }
   //s3.io.mem.dump(cacheName + ".mem")
+}
+
+class CacheInvalidUnitIO(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheBundle {
+  val metaReadBus = CacheMetaArrayReadBus()
+  val dataReadBus = CacheDataArrayReadBus()
+  val metaWriteBus = CacheMetaArrayWriteBus()
+  val mem = new SimpleBusUC
+  val req = Flipped(Decoupled(new Bundle {
+    val isCacop = Output(Bool())
+    val isIbar = Output(Bool())
+    val cacopCode = Output(UInt(5.W))
+    val cacopVA = Output(UInt(VAddrBits.W))
+    val cacopPA = Output(UInt(PAddrBits.W))
+  }))
+  val cachePipelineClear = Input(Bool())
+  val inprocess = Output(Bool())
+  val done = Output(Bool())
+}
+
+class AbstractCacheInvalidUnit(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheModule {
+  val io = IO(new CacheInvalidUnitIO())
+}
+
+// for all cacop inst and ibar, just invalid all cacheline in icache for simplicity of implementation
+class ICacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) extends AbstractCacheInvalidUnit {
+  assert(cacheName == "icache" && ro)
+
+  val s_idle :: s_wait_cache_clear :: s_invalid :: s_done :: Nil = Enum(4)
+  val state = RegInit(s_idle)
+
+  io.inprocess := io.req.valid || (state =/= s_idle)
+  io.done := (state === s_done)
+
+  io.req.ready := true.B
+
+  val receiveReq = io.req.valid && (state === s_idle)
+  val reqBits = RegEnable(io.req.bits, receiveReq)
+
+  val setCnt = RegInit(0.U(IndexBits.W))
+
+  switch (state) {
+    is (s_idle) {
+      when(io.req.valid) {
+        state := s_wait_cache_clear
+      }
+    }
+
+    is (s_wait_cache_clear) {
+      when (io.cachePipelineClear) {
+        state := s_invalid
+        setCnt := 0.U
+      }
+    }
+
+    is (s_invalid) {
+      when (io.metaWriteBus.req.fire) { setCnt := setCnt + 1.U }
+      when (setCnt === (Sets - 1).U) { state := s_done }
+    }
+
+    is (s_done) {
+      state := s_idle
+    }
+  }
+
+  io.metaWriteBus.apply(
+    valid = (state === s_invalid),
+    setIdx = setCnt,
+    waymask = Fill(Ways, 1.U),
+    data = Wire(new La32rMetaBundle()).apply(tag = 0.U, valid = false.B, dirty = false.B))
+
+  io.metaReadBus.req.valid := false.B
+  io.metaReadBus.req.bits.setIdx := 0.U
+  io.dataReadBus.req.valid := false.B
+  io.dataReadBus.req.bits.setIdx := 0.U
+  io.mem.req.valid := false.B
+  io.mem.req.bits.apply(addr = 0.U, cmd = 0.U, size = 0.U, wdata = 0.U, wmask = 0.U, user = 0.U, id = 0.U)
+  io.mem.resp.ready := true.B
+
+}
+
+// for all cacop inst and ibar, just invalid all cacheline and writeback all dirty data in dcache for simplicity of implementation
+class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) extends AbstractCacheInvalidUnit {
+  assert(cacheName == "dcache" && !ro)
+
+  val s_idle :: s_wait_cache_clear :: s_readMetaReq :: s_readMetaResp :: s_readData :: s_readDataResp :: s_writeBackData :: s_done :: Nil = Enum(8)
+  val state = RegInit(s_idle)
+
+  val s_way_idle :: s_writeBackWay :: s_writeBackLine :: s_writeResp :: s_way_done :: Nil = Enum(5)
+  val way_state = RegInit(s_way_idle)
+
+  io.inprocess := io.req.valid || (state =/= s_idle)
+  io.done := (state === s_done)
+
+  io.req.ready := true.B
+
+  val receiveReq = io.req.valid && (state === s_idle)
+  val reqBits = RegEnable(io.req.bits, receiveReq)
+
+  val metaSetCnt = RegInit(0.U(IndexBits.W))
+  val dataSetCnt = RegInit(0.U(IndexBits.W))
+  val readBeatCnt = RegInit(0.U(log2Up(LineBeats).W))
+  val readMetaVec = HoldUnless(io.metaReadBus.resp.data, RegNext(io.metaReadBus.req.fire))
+  val readDataVec = RegInit(VecInit(Seq.fill(Ways)(VecInit(Seq.fill(LineBeats)(0.U(DataBits.W))))))
+
+  val dirtyWayVec = VecInit(readMetaVec.map(way => way.valid && way.dirty))
+  val hasDirtyWay = dirtyWayVec.reduce(_||_)
+
+  val isLastSet = (Sets - 1).U
+  val isLastBeat = (LineBeats - 1).U
+
+  switch (state) {
+    is(s_idle) {
+      when(io.req.valid) {
+        state := s_wait_cache_clear
+      }
+    }
+
+    is(s_wait_cache_clear) {
+      when(io.cachePipelineClear) {
+        state := s_readMetaReq
+        metaSetCnt := 0.U
+      }
+    }
+
+    is (s_readMetaReq) {
+      when (io.metaReadBus.req.fire) { state := s_readMetaResp }
+    }
+
+    is (s_readMetaResp) {
+      when (hasDirtyWay && io.metaWriteBus.req.fire) {
+        state := s_readData
+        dataSetCnt := metaSetCnt
+        readBeatCnt := 0.U
+      }
+      when (!hasDirtyWay && io.metaWriteBus.req.fire) {
+        state := s_readMetaReq
+        metaSetCnt := metaSetCnt + 1.U
+      }
+      when (!hasDirtyWay && metaSetCnt === isLastSet && io.metaWriteBus.req.fire) { state := s_done }
+    }
+
+    is (s_readData) {
+      when (io.dataReadBus.req.fire()) { state := s_readDataResp }
+    }
+
+    is (s_readDataResp) {
+      readBeatCnt := readBeatCnt + 1.U
+      when (readBeatCnt === isLastBeat) { state := s_writeBackData }
+        .otherwise { state := s_readData }
+    }
+
+    is (s_writeBackData) {
+      when (way_state === s_way_done) {
+        when (metaSetCnt === isLastSet) { state := s_done }
+          .otherwise {
+            metaSetCnt := metaSetCnt + 1.U
+            state := s_readMetaReq
+          }
+      }
+    }
+
+    is(s_done) {
+      state := s_idle
+    }
+  }
+
+  // meta read
+  io.metaReadBus.apply(valid = state === s_readMetaReq, setIdx = metaSetCnt)
+  // meta clear write
+  io.metaWriteBus.apply(
+    valid = state === s_readMetaResp,
+    setIdx = metaSetCnt,
+    waymask = Fill(Ways, 1.U),
+    data = Wire(new La32rMetaBundle()).apply(tag = 0.U, valid = false.B, dirty = false.B))
+
+  // data read
+  io.dataReadBus.apply(valid = state === s_readData, setIdx = Cat(dataSetCnt, readBeatCnt))
+  val dataReadBack = RegNext(io.dataReadBus.req.fire())
+  when (dataReadBack) {
+    readDataVec.zip(io.dataReadBus.resp.data).map{ case (way, data) => way(readBeatCnt) := data.data }
+  }
+
+  val wayCnt = RegInit(0.U(log2Up(Ways).W))
+  val writeBeatCnt = RegInit(0.U(log2Up(LineBeats).W))
+  val isLastWay = (Ways - 1).U
+
+  val nowMeta = Reg(new La32rMetaBundle())
+  val nowData = Reg(new La32rDataBundle())
+
+  switch(way_state) {
+    is(s_way_idle) {
+      when (state === s_writeBackData) {
+        wayCnt := 0.U
+        way_state := s_writeBackWay
+      }
+    }
+
+    is (s_writeBackWay) {
+      when (dirtyWayVec(wayCnt)) {
+        writeBeatCnt := 0.U
+        nowMeta := readMetaVec(wayCnt)
+        nowData.data := readDataVec(wayCnt)(0.U)
+        way_state := s_writeBackLine
+      } .elsewhen(wayCnt === isLastWay) {
+        way_state := s_way_done
+      }.otherwise {
+        wayCnt := wayCnt + 1.U
+      }
+    }
+
+    is (s_writeBackLine) {
+      when (io.mem.req.fire) {
+        writeBeatCnt := writeBeatCnt + 1.U
+        nowData.data := readDataVec(wayCnt)(writeBeatCnt + 1.U)
+      }
+      when (io.mem.req.fire && writeBeatCnt === isLastBeat) {
+        way_state := s_writeResp
+      }
+    }
+
+    is (s_writeResp) {
+      when (io.mem.resp.fire) {
+        wayCnt := wayCnt + 1.U
+        way_state := s_writeBackWay
+      }
+      when (io.mem.resp.fire && wayCnt === isLastWay) {
+        way_state := s_way_done
+      }
+    }
+
+    is (s_way_done) {
+      way_state := s_way_idle
+    }
+  }
+
+  // write back
+  io.mem.req.valid := way_state === s_writeBackLine
+  io.mem.req.bits.apply(
+    addr = Cat(nowMeta.tag, dataSetCnt, 0.U(OffsetBits.W)),
+    cmd = Mux(writeBeatCnt === isLastBeat, SimpleBusCmd.writeLast, SimpleBusCmd.writeBurst),
+    size = (if (XLEN == 64) "b11".U else "b10".U),
+    wdata = nowData.data,
+    wmask = Fill(DataBytes, 1.U))
+
+  io.mem.resp.ready := way_state === s_writeResp
+
 }
 
 class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheModule with HasLa32rCacheIO with HasLa32rCSRConst {
