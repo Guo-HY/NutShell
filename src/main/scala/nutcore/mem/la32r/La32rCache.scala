@@ -701,7 +701,7 @@ class ICacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
 class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) extends AbstractCacheInvalidUnit {
   assert(cacheName == "dcache" && !ro)
 
-  val s_idle :: s_wait_cache_clear :: s_readMetaReq :: s_readMetaResp :: s_readData :: s_readDataResp :: s_writeBackData :: s_done :: Nil = Enum(8)
+  val s_idle :: s_wait_cache_clear :: s_storeTag :: s_readMetaReq :: s_readMetaResp :: s_readData :: s_readDataResp :: s_writeBackData :: s_done :: Nil = Enum(9)
   val state = RegInit(s_idle)
 
   val s_way_idle :: s_writeBackWay :: s_writeBackLine :: s_writeResp :: s_way_done :: Nil = Enum(5)
@@ -715,8 +715,11 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
   val receiveReq = io.req.valid && (state === s_idle)
   val reqBits = RegEnable(io.req.bits, receiveReq)
 
+  val isStoreTag = reqBits.isCacop && (reqBits.cacopCode(4, 3) === 0.U) // see la32r spec 4.2.2.1
+
   val metaSetCnt = RegInit(0.U(IndexBits.W))
   val dataSetCnt = RegInit(0.U(IndexBits.W))
+  val storeTagCnt = RegInit(0.U(IndexBits.W))
   val readBeatCnt = RegInit(0.U(log2Up(LineBeats).W))
   val readMetaVec = HoldUnless(io.metaReadBus.resp.data, RegNext(io.metaReadBus.req.fire))
   val readDataVec = RegInit(VecInit(Seq.fill(Ways)(VecInit(Seq.fill(LineBeats)(0.U(DataBits.W))))))
@@ -735,10 +738,19 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
     }
 
     is(s_wait_cache_clear) {
-      when(io.cachePipelineClear) {
+      when(io.cachePipelineClear && !isStoreTag) {
         state := s_readMetaReq
         metaSetCnt := 0.U
       }
+      when (io.cachePipelineClear && isStoreTag) {
+        state := s_storeTag
+        storeTagCnt := 0.U
+      }
+    }
+
+    is (s_storeTag) {
+      when (io.metaWriteBus.req.fire) { storeTagCnt := storeTagCnt + 1.U }
+      when (storeTagCnt === isLastSet) { state := s_done }
     }
 
     is (s_readMetaReq) {
@@ -787,8 +799,8 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
   io.metaReadBus.apply(valid = state === s_readMetaReq, setIdx = metaSetCnt)
   // meta clear write
   io.metaWriteBus.apply(
-    valid = state === s_readMetaResp,
-    setIdx = metaSetCnt,
+    valid = (state === s_readMetaResp) || (state === s_storeTag),
+    setIdx = Mux(state === s_storeTag, storeTagCnt, metaSetCnt),
     waymask = Fill(Ways, 1.U),
     data = Wire(new La32rMetaBundle()).apply(tag = 0.U, valid = false.B, dirty = false.B))
 
