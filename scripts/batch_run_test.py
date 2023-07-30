@@ -59,7 +59,10 @@ cputest_list = ["add-longlong",
 ]
 
 misctest_dir = os.path.join(AM_HOME, "tests/misctest/build")
-misctest_list = ["csr-read-write", "tlb-read-write", "ibar-test", "dbar-test", "preld-test"]
+misctest_list = ["csr-read-write", "tlb-read-write", "preld-test", "confreg-test"]
+
+cachetest_dir = os.path.join(AM_HOME, "tests/cachetest/build")
+cachetest_list = ["access", "cache-flush", "dbar-test", "dcache-walk", "ibar-test", "load-after-store-test"]
 
 nscscc_func_test_dir = os.path.join(AM_HOME, "tests/chiplabtest/build")
 nscscc_func_test_list = ["chiplabfunc.bin"]
@@ -129,6 +132,14 @@ for tp in misctest_list:
     tp_path = os.path.join(misctest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
     run_single_test(tp_path)
 logging.debug("all misctest pass")
+
+# cachetest
+logging.debug("begin cachetest")
+
+for tp in cachetest_list:
+    tp_path = os.path.join(cachetest_dir, tp + "-" + ISA + "-" + PLATFORM + ".bin")
+    run_single_test(tp_path)
+logging.debug("all cachetest pass")
 
 # nscscc func test
 nscscc_func_test_num = len(nscscc_func_test_list)
