@@ -2,6 +2,7 @@ stages:
   - build-emu
   - func-tests
   - app-tests
+  - perf-tests
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
@@ -65,16 +66,6 @@ chiplabtest:
         $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
       done
 
-nscsss_perf:
-  stage: func-tests
-  variables:
-    ARCH: la32r-nutshell
-  script:
-    - make -C $AM_HOME/apps/nscscc_perf
-    - >
-      for case in $(find $AM_HOME/apps/nscscc_perf/obj -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
-      done
 
 apps:
   stage: app-tests
@@ -87,5 +78,17 @@ apps:
     - make -C $AM_HOME/apps/$APP
     - >
       for case in $(find $AM_HOME/apps/$APP/build -name '*.bin'); do
+        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+      done
+
+
+nscsss_perf:
+  stage: perf-tests
+  variables:
+    ARCH: la32r-nutshell
+  script:
+    - make -C $AM_HOME/apps/nscscc_perf
+    - >
+      for case in $(find $AM_HOME/apps/nscscc_perf/obj -name '*.bin'); do
         $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
       done
