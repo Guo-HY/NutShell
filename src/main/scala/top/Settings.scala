@@ -102,6 +102,8 @@ object La32rSettings {
     "HasITLB" -> false,
     "HasDcache" -> true,
     "HasIcache" -> true,
+    "IcacheSize" -> 8, // kbytes
+    "DcacheSize" -> 8, // kbytes
     "MmodeOnly" -> true,
     "IsRV32" -> false,
     "EnableRVC" -> false,
@@ -113,6 +115,7 @@ object La32rSettings {
     "HasDMMU" -> true,
     "TlbEntryNum" -> 32,
     "ConfregBase1" -> 0xbfaf0000L, // see chiplab/IP/BRIDGE/bridge_1x2.v : line 48/49 and line 107/108 // TODO : la32r-linux seems to use different device address
+    "ConfregBase2" -> 0x1faf0000L,
     "ConfregSize" -> 0x10000L,
     "RAMBase" -> 0x0L,
     "RAMSize" -> 0x100000000L, // 4096 MB memory

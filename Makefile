@@ -11,7 +11,7 @@ SIMTOP = top.TopMain
 IMAGE ?= ready-to-run/linux.bin
 
 DATAWIDTH ?= 32
-BOARD ?= sim  # sim  pynq  axu3cg
+BOARD ?= sim #loongsonfpga  # sim  pynq  axu3cg
 CORE  ?= la32r  # inorder  ooo  embedded la32r
 
 .DEFAULT_GOAL = verilog
@@ -19,10 +19,11 @@ CORE  ?= la32r  # inorder  ooo  embedded la32r
 help:
 	./mill chiselModule.runMain top.$(TOP) --help BOARD=$(BOARD) CORE=$(CORE)
 
+# --infer-rw $(FPGATOP) --repl-seq-mem -c:$(FPGATOP):-o:$(@D)/$(@F).conf
 $(TOP_V): $(SCALA_FILE)
 	mkdir -p $(@D)
-	./mill chiselModule.runMain top.$(TOP) -td $(@D) --output-file $(@F) --infer-rw $(FPGATOP) --repl-seq-mem -c:$(FPGATOP):-o:$(@D)/$(@F).conf BOARD=$(BOARD) CORE=$(CORE)
-	sed -i -e 's/_\(aw\|ar\|w\|r\|b\)_\(\|bits_\)/_\1/g' $@
+	./mill chiselModule.runMain top.$(TOP) -td $(@D) --output-file $(@F) BOARD=$(BOARD) CORE=$(CORE)
+# sed -i -e 's/_\(aw\|ar\|w\|r\|b\)_\(\|bits_\)/_\1/g' $@
 	@git log -n 1 >> .__head__
 	@git diff >> .__diff__
 	@sed -i 's/^/\/\// ' .__head__

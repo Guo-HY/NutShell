@@ -18,6 +18,7 @@ object DeviceSpace extends HasNutCoreParameter {
   // (start, size)
   def device = List(
     (Settings.getLong("ConfregBase1"), Settings.getLong("ConfregSize")), // confreg
+    (Settings.getLong("ConfregBase2"), Settings.getLong("ConfregSize")),
   )
 
   def isDevice(addr: UInt) = device.map(range => {
@@ -50,16 +51,19 @@ class SimTop extends Module  {
 
   val deviceXbar = Module(new SimpleBusCrossbar1toN(addrSpace))
   val ramXbar = Module(new SimpleBusCrossbarNto1(2))
+  val confregXbar = Module(new SimpleBusCrossbarNto1(2))
 
   deviceXbar.io.in <> core.io.uncachedMem
 
   ramXbar.io.in(0) <> core.io.cachedMem
-  ramXbar.io.in(1) <> deviceXbar.io.out(1)
+  ramXbar.io.in(1) <> deviceXbar.io.out(2)
 
   memdelay.io.in <> ramXbar.io.out.toAXI4(isFromCache = true)
   mem.io.in <> memdelay.io.out
 
-  confreg.io.in <> deviceXbar.io.out(0).toAXI4Lite()
+  confregXbar.io.in(0) <> deviceXbar.io.out(0)
+  confregXbar.io.in(1) <> deviceXbar.io.out(1)
+  confreg.io.in <> confregXbar.io.out.toAXI4Lite()
 
 
   val log_begin, log_end, log_level = WireInit(0.U(64.W))
@@ -81,8 +85,6 @@ class SimTop extends Module  {
   io.timer := GTimer()
 
   // TODO : support outer interrupt sim
-  val ipi = WireInit(false.B) // inter-core interrupt for la32r
-  val hwi = WireInit(0.U(8.W)) // hardware interrupt for la32r
-  BoringUtils.addSource(ipi, "ipi")
-  BoringUtils.addSource(hwi, "hwi")
+  core.io.ipi := false.B
+  core.io.hwi := 0.U
 }

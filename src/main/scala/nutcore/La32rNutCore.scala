@@ -12,6 +12,8 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
   val io = IO(new Bundle() {
     val cachedMem = new SimpleBusUC(addrBits = PAddrBits)
     val uncachedMem = new SimpleBusUC(addrBits = PAddrBits)
+    val ipi = Input(Bool()) // inter-core interrupt for la32r
+    val hwi = Input(UInt(8.W)) // hardware interrupt for la32r
   })
 
   println("dmmuUserBits=", dmmuUserBits)
@@ -28,11 +30,11 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   val immu = La32rMMU(in = frontend.io.imem, enable = HasIMMU)(La32rMMUConfig(name = "immu", userBits = immuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val icache = La32rCache(in = immu.io.out, mmio = uncachedXbar.io.in(1), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), enable = HasIcache)(La32rCacheConfig(ro = true, name = "icache", userBits = immuUserBits, totalSize = 1))
+  val icache = La32rCache(in = immu.io.out, mmio = uncachedXbar.io.in(1), flush = Fill(2, frontend.io.flushVec(0) | frontend.io.bpFlush), enable = HasIcache)(La32rCacheConfig(ro = true, name = "icache", userBits = immuUserBits, totalSize = Settings.getInt("IcacheSize")))
 
   val dmmu = La32rMMU(in = backend.io.dmem, enable = HasDMMU)(La32rMMUConfig(name = "dmmu", userBits = dmmuUserBits, tlbEntryNum = Settings.getInt("TlbEntryNum"), FPGAPlatform = p.FPGAPlatform))
 
-  val dcache = La32rCache(in = dmmu.io.out, mmio = uncachedXbar.io.in(0), flush = "b00".U, enable = HasDcache)(La32rCacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits, totalSize = 1))
+  val dcache = La32rCache(in = dmmu.io.out, mmio = uncachedXbar.io.in(0), flush = "b00".U, enable = HasDcache)(La32rCacheConfig(ro = false, name = "dcache", userBits = dmmuUserBits, totalSize = Settings.getInt("DcacheSize")))
 
   cachedXbar.io.in(0) <> dcache.io.out.mem
   cachedXbar.io.in(1) <> icache.io.out.mem
@@ -49,5 +51,8 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
 
   frontend.io.ipf := DontCare
   backend.io.memMMU <> DontCare
+
+  BoringUtils.addSource(io.ipi, "ipi")
+  BoringUtils.addSource(io.hwi, "hwi")
 
 }

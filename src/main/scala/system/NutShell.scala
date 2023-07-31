@@ -133,20 +133,20 @@ class NutShell(implicit val p: NutCoreConfig) extends Module with HasSoCParamete
 
 
   // ILA
-  if (p.FPGAPlatform) {
-    def BoringUtilsConnect(sink: UInt, id: String) {
-      val temp = WireInit(0.U(64.W))
-      BoringUtils.addSink(temp, id)
-      sink := temp
-    }
-
-    val dummy = WireInit(0.U.asTypeOf(new ILABundle))
-    val ila = io.ila.getOrElse(dummy)
-    BoringUtilsConnect(ila.WBUpc      ,"ilaWBUpc")
-    BoringUtilsConnect(ila.WBUvalid   ,"ilaWBUvalid")
-    BoringUtilsConnect(ila.WBUrfWen   ,"ilaWBUrfWen")
-    BoringUtilsConnect(ila.WBUrfDest  ,"ilaWBUrfDest")
-    BoringUtilsConnect(ila.WBUrfData  ,"ilaWBUrfData")
-    BoringUtilsConnect(ila.InstrCnt   ,"ilaInstrCnt")
-  }
+//  if (p.FPGAPlatform) {
+//    def BoringUtilsConnect(sink: UInt, id: String) {
+//      val temp = WireInit(0.U(64.W))
+//      BoringUtils.addSink(temp, id)
+//      sink := temp
+//    }
+//
+//    val dummy = WireInit(0.U.asTypeOf(new ILABundle))
+//    val ila = io.ila.getOrElse(dummy)
+//    BoringUtilsConnect(ila.WBUpc      ,"ilaWBUpc")
+//    BoringUtilsConnect(ila.WBUvalid   ,"ilaWBUvalid")
+//    BoringUtilsConnect(ila.WBUrfWen   ,"ilaWBUrfWen")
+//    BoringUtilsConnect(ila.WBUrfDest  ,"ilaWBUrfDest")
+//    BoringUtilsConnect(ila.WBUrfData  ,"ilaWBUrfData")
+//    BoringUtilsConnect(ila.InstrCnt   ,"ilaInstrCnt")
+//  }
 }

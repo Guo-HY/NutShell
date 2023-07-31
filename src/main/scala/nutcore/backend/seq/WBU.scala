@@ -37,14 +37,17 @@ class WBU(implicit val p: NutCoreConfig) extends NutCoreModule{
 
   io.redirect := io.in.bits.decode.cf.redirect
   io.redirect.valid := io.in.bits.decode.cf.redirect.valid && io.in.valid
-  
-  val runahead_redirect = Module(new DifftestRunaheadRedirectEvent)
-  runahead_redirect.io.clock := clock
-  runahead_redirect.io.coreid := 0.U
-  runahead_redirect.io.valid := io.redirect.valid
-  runahead_redirect.io.pc := io.in.bits.decode.cf.pc // for debug only
-  runahead_redirect.io.target_pc := io.in.bits.decode.cf.redirect.target // for debug only
-  runahead_redirect.io.checkpoint_id := io.in.bits.decode.cf.runahead_checkpoint_id // make sure it is right
+
+  if (!p.FPGAPlatform) {
+    val runahead_redirect = Module(new DifftestRunaheadRedirectEvent)
+    runahead_redirect.io.clock := clock
+    runahead_redirect.io.coreid := 0.U
+    runahead_redirect.io.valid := io.redirect.valid
+    runahead_redirect.io.pc := io.in.bits.decode.cf.pc // for debug only
+    runahead_redirect.io.target_pc := io.in.bits.decode.cf.redirect.target // for debug only
+    runahead_redirect.io.checkpoint_id := io.in.bits.decode.cf.runahead_checkpoint_id // make sure it is right
+  }
+
 
   // when(runahead_redirect.io.valid) {
   //   printf("DUT pc %x redirect to %x cpid %x\n", runahead_redirect.io.pc, runahead_redirect.io.target_pc, runahead_redirect.io.checkpoint_id)
@@ -103,10 +106,9 @@ class WBU(implicit val p: NutCoreConfig) extends NutCoreModule{
     diffStore.io.storeData := RegNext(io.in.bits.storeCheck.storeData)
     diffStore.io.pc := RegNext(io.in.bits.decode.cf.pc)
   } else {
-    BoringUtils.addSource(io.in.valid, "ilaWBUvalid")
-    BoringUtils.addSource(io.in.bits.decode.cf.pc, "ilaWBUpc")
-    BoringUtils.addSource(io.wb.rfWen, "ilaWBUrfWen")
-    BoringUtils.addSource(io.wb.rfDest, "ilaWBUrfDest")
-    BoringUtils.addSource(io.wb.rfData, "ilaWBUrfData")
+    BoringUtils.addSource(RegNext(io.in.bits.decode.cf.pc), "DEBUG_WB_PC")
+    BoringUtils.addSource(RegNext(Fill(4, io.wb.rfWen)), "DEBUG_WB_RF_WEN")
+    BoringUtils.addSource(RegNext(io.wb.rfDest), "DEBUG_WB_RF_WNUM")
+    BoringUtils.addSource(RegNext(io.wb.rfData), "DEBUG_WB_RF_WDATA")
   }
 }
