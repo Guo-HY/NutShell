@@ -2,6 +2,8 @@ import os
 import sys
 import logging
 import subprocess
+import sh
+import re
 
 NOOP_HOME = os.getenv("NOOP_HOME")
 NEMU_HOME = os.getenv("NEMU_HOME")
@@ -67,6 +69,18 @@ cachetest_list = ["access", "cache-flush", "dbar-test", "dcache-walk", "ibar-tes
 nscscc_func_test_dir = os.path.join(AM_HOME, "tests/chiplabtest/build")
 nscscc_func_test_list = ["chiplabfunc.bin"]
 
+nscscc_perf_dir = os.path.join(AM_HOME, "apps/nscscc_perf/obj")
+nscscc_perf_list = ["bitcount",
+                    "bubble_sort",
+                    "coremark",
+                    "crc32",
+                    "dhrystone",
+                    "quick_sort",
+                    "select_sort",
+                    "sha",
+                    "stream_copy",
+                    "stringsearch",]
+
 apps_dir = os.path.join(AM_HOME, "apps")
 apps_list = [
     "coremark",
@@ -76,8 +90,8 @@ apps_list = [
 
 
 
-runlog = open("./run.log",'wt')
-logpath = sys.path[0] + "/run.log"
+runlog = open("./run.log",'wt+')
+logpath = os.path.join(os.getcwd(), "run.log")
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -113,6 +127,7 @@ def run_single_test(tp_path):
         print(out_bytes.decode('utf-8'), file=runlog)
         exit(1)
     print(out_bytes.decode('utf-8'), file=runlog)
+    return out_bytes.decode('utf-8')
 
 # cputest
 cputestnum = len(cputest_list)
@@ -148,6 +163,18 @@ for tp in nscscc_func_test_list:
     tp_path = os.path.join(nscscc_func_test_dir, tp)
     run_single_test(tp_path)
 logging.debug("all nscscc func test pass")
+
+nscscc_perf_test_num = len(nscscc_perf_list)
+nscscc_perf_ipc_accum = 0
+logging.debug("begin nscscc perf test")
+for tp in nscscc_perf_list:
+    tp_path = os.path.join(nscscc_perf_dir, tp, "inst_data.bin")
+    log = run_single_test(tp_path)
+    ipc_all = re.findall(r"IPC = [0-9].*[0-9]", log)
+    ipc = re.findall(r"[0-9].*[0-9]", str(ipc_all))[-1]
+    print(tp + " ipc : " + str(ipc))
+    nscscc_perf_ipc_accum = nscscc_perf_ipc_accum + float(ipc)
+logging.debug("all nscscc perf test pass, average ipc : " + str(nscscc_perf_ipc_accum / nscscc_perf_test_num))    
 
 # apps
 logging.debug("begin apps test")
