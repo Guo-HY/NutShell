@@ -509,8 +509,8 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
   val s1 = Module(new La32rCacheStage1)
   val s2 = Module(new La32rCacheStage2)
   val s3 = Module(new La32rCacheStage3)
-  val metaArray = Module(new SRAMTemplateWithArbiter(nRead = 2, new La32rMetaBundle, set = Sets, way = Ways))
-  val dataArray = Module(new SRAMTemplateWithArbiter(nRead = 3, new La32rDataBundle, set = Sets * LineBeats, way = Ways))
+  val metaArray = Module(new SRAMTemplateWithArbiter(nRead = 2, new La32rMetaBundle, set = Sets, way = Ways, shouldReset = true))
+  val dataArray = Module(new SRAMTemplateWithArbiter(nRead = 3, new La32rDataBundle, set = Sets * LineBeats, way = Ways, shouldReset = true))
 
   val cacheInvalidUnit = if (cacheName == "icache") Module(new ICacheInvalidUnit()) else Module(new DCacheInvalidUnit())
 
