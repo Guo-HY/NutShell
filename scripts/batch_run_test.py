@@ -4,6 +4,10 @@ import logging
 import subprocess
 import sh
 import re
+import random
+
+seed = random.randint(1, 99999)
+print("use seed="+str(seed))
 
 NOOP_HOME = os.getenv("NOOP_HOME")
 NEMU_HOME = os.getenv("NEMU_HOME")
@@ -118,7 +122,7 @@ def run_single_test(tp_path):
     if not os.path.exists(tp_path):
         logging.debug(tp_path + " does not exists, skip")
         return
-    runcommand = emu_path + " -i " + tp_path + " -b 0 -e 0 -l 0"
+    runcommand = emu_path + " --seed=" + str(seed) + " -i " + tp_path + " -b 0 -e 0 -l 0"
     logging.debug("runcommand:" + runcommand)
     try:
         out_bytes = subprocess.check_output([emu_path, "-i", tp_path], stderr=subprocess.STDOUT)
