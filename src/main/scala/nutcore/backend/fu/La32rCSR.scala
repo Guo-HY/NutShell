@@ -242,6 +242,8 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   val TLBELO0 = RegInit(0.U.asTypeOf(new TLBELOStruct))
   val TLBELO1 = RegInit(0.U.asTypeOf(new TLBELOStruct))
 
+  val raiseException = WireInit(false.B)
+
   // perfcnt
   val hasPerfCnt = EnablePerfCnt && !p.FPGAPlatform
   val nrPerfCnts = if (hasPerfCnt) 0x80 else 0x3
@@ -416,6 +418,23 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   val hitCacopTlbExcpTmp = cacopmmu.io.out.req.bits.user.get.asTypeOf(new ImmuUserBundle).tlbExcp
   val hitCacopTlbExcp = (hitCacopTlbExcpTmp.asUInt() & Fill(hitCacopTlbExcpTmp.asUInt().getWidth, isHitCacop)).asTypeOf(hitCacopTlbExcpTmp)
 
+  val cacop_idle :: cacop_do :: cacop_done :: Nil = Enum(3)
+  val cacop_state = RegInit(cacop_idle)
+  val dcacheFlushDone = WireInit(false.B)
+  val icacheFlushDone = WireInit(false.B)
+  BoringUtils.addSink(dcacheFlushDone, "DCACHE_FLUSH_DONE")
+  BoringUtils.addSink(icacheFlushDone, "ICACHE_FLUSH_DONE")
+  switch (cacop_state) {
+    is (cacop_idle) {
+      when (isCacop && !raiseException) { cacop_state := cacop_do }
+    }
+    is (cacop_do) {
+      when (icacheFlushDone || dcacheFlushDone) { cacop_state := cacop_done }
+    }
+    is (cacop_done) {
+      when (io.out.fire) { cacop_state := cacop_idle }
+    }
+  }
 
   // Exception & interrupt
 
@@ -455,7 +474,7 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   csrExceptionVec(INE) := valid && func === La32rCSROpType.invtlb && io.cfIn.instr(4, 0) > 6.U
 
   val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, io.instrValid)) | csrExceptionVec.asUInt
-  val raiseException = exceptionVec.orR
+  raiseException := exceptionVec.orR
   val excptionNO = PriorityEncoder(exceptionVec)
   io.wenFix := raiseException // TODO : what is this
   io.intrNO := excptionNO
@@ -631,8 +650,8 @@ class La32rCSR(implicit override val p: NutCoreConfig) extends AbstractCSR with 
   io.redirect.target := Mux(retFromExcp, ERA, Mux(raiseException, exceptionEntry, Mux(isIdle, io.cfIn.pc, io.cfIn.pc + 4.U)))
 
 
-  io.in.ready := true.B
-  io.out.valid := valid
+  io.in.ready := (cacop_state === cacop_idle)
+  io.out.valid := (valid && !isCacop) || (isCacop && cacop_state === cacop_done) || (isCacop && raiseException)
 
   io.dmemMMU := DontCare
   io.imemMMU := DontCare
