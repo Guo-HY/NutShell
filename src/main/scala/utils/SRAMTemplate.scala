@@ -99,7 +99,7 @@ class SRAMTemplate[T <: Data](gen: T, set: Int, way: Int = 1,
   io.r.resp.data := VecInit(rdata)
 
   io.r.req.ready := !resetState && (if (singlePort) !wen else true.B)
-  io.w.req.ready := true.B
+  io.w.req.ready := !resetState //true.B
 
   Debug(false) {
     when (wen) {
