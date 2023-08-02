@@ -55,4 +55,38 @@ class La32rNutCore(implicit val p: NutCoreConfig) extends NutCoreModule {
   BoringUtils.addSource(io.ipi, "ipi")
   BoringUtils.addSource(io.hwi, "hwi")
 
+  val s_idle :: s_icache :: s_dcache :: Nil = Enum(3)
+  val cacheSemaphore = RegInit(s_idle)
+  val icacheTryGetSem = WireInit(false.B)
+  val dcacheTryGetSem = WireInit(false.B)
+  val sendICacheSem = WireInit(false.B)
+  val sendDCacheSem = WireInit(false.B)
+  val icacheReleaseSem = WireInit(false.B)
+  val dcacheReleaseSem = WireInit(false.B)
+  BoringUtils.addSink(icacheTryGetSem, "icacheTryGetSem")
+  BoringUtils.addSink(dcacheTryGetSem, "dcacheTryGetSem")
+  BoringUtils.addSource(sendICacheSem, "sendICacheSem")
+  BoringUtils.addSource(sendDCacheSem, "sendDCacheSem")
+  BoringUtils.addSink(icacheReleaseSem, "icacheReleaseSem")
+  BoringUtils.addSink(dcacheReleaseSem, "dcacheReleaseSem")
+
+  sendICacheSem := (cacheSemaphore === s_idle) && icacheTryGetSem && !dcacheTryGetSem
+  sendDCacheSem := (cacheSemaphore === s_idle) && dcacheTryGetSem
+  switch (cacheSemaphore) {
+    is (s_idle) {
+      when (sendICacheSem) {
+        cacheSemaphore := s_icache
+      }
+      when (sendDCacheSem) {
+        cacheSemaphore := s_dcache
+      }
+    }
+    is (s_icache) {
+      when (icacheReleaseSem) { cacheSemaphore := s_idle }
+    }
+    is (s_dcache) {
+      when (dcacheReleaseSem) { cacheSemaphore := s_idle }
+    }
+  }
+
 }
