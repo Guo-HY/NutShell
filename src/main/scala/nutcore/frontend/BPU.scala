@@ -220,14 +220,20 @@ class BPU_embedded extends NutCoreModule {
   val btbHit = btbRead.tag === btbAddr.getTag(pcLatch) && !flush && RegNext(btb.io.r.req.ready, init = false.B)
 
   // PHT
-  val pht = Mem(NRbtb, UInt(2.W))
-  val phtTaken = RegEnable(pht.read(btbAddr.getIdx(io.in.pc.bits))(1), io.in.pc.valid)
+  //  val pht = Mem(NRbtb, UInt(2.W))
+  val pht = Module(new SRAMTemplateWithArbiter(2, UInt(2.W), set = NRbtb, shouldReset = true))
+  pht.io.r(1).req.valid := io.in.pc.valid
+  pht.io.r(1).req.bits.setIdx := btbAddr.getIdx(io.in.pc.bits)
+  val phtTaken = pht.io.r(1).resp.data(0)(1) && RegNext(pht.io.r(1).req.fire, init = false.B) //RegEnable(pht.read(btbAddr.getIdx(io.in.pc.bits))(1), io.in.pc.valid)
 
   // RAS
   val NRras = 16
-  val ras = Mem(NRras, UInt(32.W))
+//  val ras = Mem(NRras, UInt(32.W))
+  val ras = Module(new SRAMTemplate(UInt(32.W), set = NRras, shouldReset = true, holdRead = true, singlePort = true))
   val sp = Counter(NRras)
-  val rasTarget = RegEnable(ras.read(sp.value), io.in.pc.valid)
+  ras.io.r.req.valid := io.in.pc.valid
+  ras.io.r.req.bits.setIdx := sp.value
+  val rasTarget = ras.io.r.resp.data(0) // RegEnable(ras.read(sp.value), io.in.pc.valid)
 
   // update
   val req = WireInit(0.U.asTypeOf(new BPUUpdateReq))
@@ -247,19 +253,34 @@ class BPU_embedded extends NutCoreModule {
   btb.io.w.req.bits.setIdx := btbAddr.getIdx(req.pc)
   btb.io.w.req.bits.data := btbWrite
 
-  val cnt = RegNext(pht.read(btbAddr.getIdx(req.pc)))
+  pht.io.r(0).req.valid := req.valid
+  pht.io.r(0).req.bits.setIdx := btbAddr.getIdx(req.pc)
+  val cnt = pht.io.r(0).resp.data(0) //RegNext(pht.read(btbAddr.getIdx(req.pc)))
   val reqLatch = RegNext(req)
-  when (reqLatch.valid && ALUOpType.isBranch(reqLatch.fuOpType)) {
-    val taken = reqLatch.actualTaken
-    val newCnt = Mux(taken, cnt + 1.U, cnt - 1.U)
-    val wen = (taken && (cnt =/= "b11".U)) || (!taken && (cnt =/= "b00".U))
-    when (wen) {
-      pht.write(btbAddr.getIdx(reqLatch.pc), newCnt)
-    }
-  }
+
+  val taken = reqLatch.actualTaken
+  val newCnt = Mux(taken, cnt + 1.U, cnt - 1.U)
+  val phtwen = ((taken && (cnt =/= "b11".U)) || (!taken && (cnt =/= "b00".U))) && reqLatch.valid && ALUOpType.isBranch(reqLatch.fuOpType)
+  pht.io.w.req.valid := phtwen
+  pht.io.w.req.bits.setIdx := btbAddr.getIdx(reqLatch.pc)
+  pht.io.w.req.bits.data := newCnt
+
+//  when (reqLatch.valid && ALUOpType.isBranch(reqLatch.fuOpType)) {
+//    val taken = reqLatch.actualTaken
+//    val newCnt = Mux(taken, cnt + 1.U, cnt - 1.U)
+//    val wen = (taken && (cnt =/= "b11".U)) || (!taken && (cnt =/= "b00".U))
+//    when (wen) {
+//      pht.write(btbAddr.getIdx(reqLatch.pc), newCnt)
+//    }
+//  }
+
+  ras.io.w.req.valid := req.valid && (req.fuOpType === ALUOpType.call)
+  ras.io.w.req.bits.setIdx := sp.value + 1.U
+  ras.io.w.req.bits.data := req.pc + 4.U
+
   when (req.valid) {
     when (req.fuOpType === ALUOpType.call) {
-      ras.write(sp.value + 1.U, req.pc + 4.U)
+//      ras.write(sp.value + 1.U, req.pc + 4.U)
       sp.value := sp.value + 1.U
     }
     .elsewhen (req.fuOpType === ALUOpType.ret) {
