@@ -914,7 +914,7 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
 
 class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheModule with HasLa32rCacheIO with HasLa32rCSRConst {
   assert(cacheName == "icache" || cacheName == "dcache")
-  val s_idle :: s_memReq :: s_memResp :: s_mmioReq :: s_mmioResp :: s_wait_resp :: Nil = Enum(6)
+  val s_idle :: s_wait_sem :: s_memReq :: s_memResp :: s_mmioReq :: s_mmioResp :: s_wait_resp :: Nil = Enum(7)
   val state = RegInit(s_idle)
 
   val memuser = RegEnable(io.in.req.bits.user.getOrElse(0.U), io.in.req.fire())
@@ -927,6 +927,21 @@ class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rC
     ismmio := io.in.req.bits.user.get.asTypeOf(new DmmuUserBundle).mat === StronglyOrderedUncached
   }
 
+  // cache semaphore
+  val tryGetSem = WireInit(false.B)
+  val receiveSem = WireInit(false.B)
+  val releaseSem = WireInit(false.B)
+  // cache semaphore
+  if (cacheName == "icache") {
+    BoringUtils.addSource(tryGetSem, "icacheTryGetSem")
+    BoringUtils.addSink(receiveSem, "sendICacheSem")
+    BoringUtils.addSource(releaseSem, "icacheReleaseSem")
+  } else {
+    BoringUtils.addSource(tryGetSem, "dcacheTryGetSem")
+    BoringUtils.addSink(receiveSem, "sendDCacheSem")
+    BoringUtils.addSource(releaseSem, "dcacheReleaseSem")
+  }
+
   val ismmioRec = RegEnable(ismmio, io.in.req.fire())
 
   val hasTlbExcp = WireInit(false.B)
@@ -937,12 +952,15 @@ class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rC
 
   val alreadyOutFire = RegEnable(true.B, init = false.B, io.in.resp.fire())
 
-  val isInvalidAddr = false.B// !PMA.isValidAddr(io.in.req.bits.addr)
+//  val isInvalidAddr = false.B// !PMA.isValidAddr(io.in.req.bits.addr)
 
   switch (state) {
     is (s_idle) {
       alreadyOutFire := false.B
-      when (io.in.req.fire() && !io.flush(0)) { state := Mux(isInvalidAddr, s_wait_resp, Mux(ismmio, s_mmioReq, s_memReq)) }
+      when (io.in.req.fire() && !io.flush(0)) { state := s_wait_sem }
+    }
+    is (s_wait_sem) {
+      when (receiveSem) { state := Mux(ismmioRec, s_mmioReq, s_memReq) }
     }
     is (s_memReq) {
       when (hasTlbExcp) { state := s_wait_resp }
@@ -1029,7 +1047,7 @@ class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rC
   val flush_counter = RegInit(0.U(5.W))
   switch (flush_state) {
     is (s_flush_idle) {
-      when (flush) {
+      when (flush || cacopValid) {
         flush_state := s_flush_doing
         flush_counter := 0.U
       }
@@ -1043,6 +1061,9 @@ class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rC
   dcacheFlushDone := flush_state === s_flush_done
   icacheFlushDone := flush_state === s_flush_done
 
+
+  tryGetSem := state === s_wait_sem
+  releaseSem := state === s_idle || state === s_wait_resp
 
   Debug(io.in.req.fire(), p"in.req: ${io.in.req.bits}\n")
   Debug(io.out.mem.req.fire(), p"out.mem.req: ${io.out.mem.req.bits}\n")
