@@ -88,7 +88,7 @@ class La32rTLB(implicit val la32rMMUConfig: La32rMMUConfig) extends NutCoreModul
 
   val io = IO(new La32rTLBIO())
 
-  val tlbEntrys = Reg(Vec(tlbEntryNum, new La32rTLBEntry()))
+  val tlbEntrys = RegInit(0.U.asTypeOf(Vec(tlbEntryNum, new La32rTLBEntry())))
 
   val ASID = WireInit(0.U(32.W))
   BoringUtils.addSink(ASID, "ASID")
