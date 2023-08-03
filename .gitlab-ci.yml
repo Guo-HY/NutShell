@@ -33,39 +33,19 @@ build-emu:
       - ./build/emu
       - ./deps/nemu/NEMU/build/la32r-nemu-interpreter-so
 
-cputest:
+funcs:
   stage: func-tests
   variables:
     ARCH: la32r-eula
+  parallel:
+    matrix:
+      - FUNC: [cputest, misctest, chiplabtest, cachetest]
   script:
-    - make -C $AM_HOME/tests/cputest
+    - make -C $AM_HOME/tests/$FUNC
     - >
-      for case in $(find $AM_HOME/tests/cputest/build -name '*.bin'); do
+      for case in $(find $AM_HOME/tests/$FUNC/build -name '*.bin'); do
         $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
       done
-
-misctest:
-  stage: func-tests
-  variables:
-    ARCH: la32r-eula
-  script:
-    - make -C $AM_HOME/tests/misctest
-    - >
-      for case in $(find $AM_HOME/tests/misctest/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
-      done
-
-chiplabtest:
-  stage: func-tests
-  variables:
-    ARCH: la32r-eula
-  script:
-    - make -C $AM_HOME/tests/chiplabtest
-    - >
-      for case in $(find $AM_HOME/tests/chiplabtest/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
-      done
-
 
 apps:
   stage: app-tests
