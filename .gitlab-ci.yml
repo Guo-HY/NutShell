@@ -36,7 +36,7 @@ build-emu:
 cputest:
   stage: func-tests
   variables:
-    ARCH: la32r-nutshell
+    ARCH: la32r-eula
   script:
     - make -C $AM_HOME/tests/cputest
     - >
@@ -47,7 +47,7 @@ cputest:
 misctest:
   stage: func-tests
   variables:
-    ARCH: la32r-nutshell
+    ARCH: la32r-eula
   script:
     - make -C $AM_HOME/tests/misctest
     - >
@@ -58,7 +58,7 @@ misctest:
 chiplabtest:
   stage: func-tests
   variables:
-    ARCH: la32r-nutshell
+    ARCH: la32r-eula
   script:
     - make -C $AM_HOME/tests/chiplabtest
     - >
@@ -70,7 +70,7 @@ chiplabtest:
 apps:
   stage: app-tests
   variables:
-    ARCH: la32r-nutshell
+    ARCH: la32r-eula
   parallel:
     matrix:
       - APP: [coremark, dhrystone, microbench]
@@ -85,7 +85,7 @@ apps:
 nscsss_perf:
   stage: perf-tests
   variables:
-    ARCH: la32r-nutshell
+    ARCH: la32r-eula
   script:
     - make -C $AM_HOME/apps/nscscc_perf
     - >
