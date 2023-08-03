@@ -1,18 +1,4 @@
-/**************************************************************************************
-* Copyright (c) 2020 Institute of Computing Technology, CAS
-* Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
-* NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
-* You may obtain a copy of Mulan PSL v2 at:
-*             http://license.coscl.org.cn/MulanPSL2 
-* 
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER 
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
-* FIT FOR A PARTICULAR PURPOSE.  
-*
-* See the Mulan PSL v2 for more details.  
-***************************************************************************************/
+
 
 package utils
 
@@ -21,7 +7,7 @@ import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 import utils.LogLevel.LogLevel
 
-import nutcore.NutCoreConfig
+import eulacore.EulaCoreConfig
 
 object LogLevel  {
   type LogLevel = UInt
@@ -73,9 +59,9 @@ sealed abstract class LogHelper(val logLevel: LogLevel) {
   def apply(prefix: Boolean, cond: Bool, pable: Printable)(implicit name: String): Any =
     LogUtil(logLevel)(prefix, cond, pable)
 
-  // NOOP/NutShell style debug
-  def apply(flag: Boolean = NutCoreConfig().EnableDebug, cond: Bool = true.B)(body: => Unit): Any = {
-    if(NutCoreConfig().EnhancedLog){
+
+  def apply(flag: Boolean = EulaCoreConfig().EnableDebug, cond: Bool = true.B)(body: => Unit): Any = {
+    if(EulaCoreConfig().EnhancedLog){
       if(flag) { when (cond && LogUtil.displayLog) { body } }
     } else {
       if(flag) { when (cond) { body } }

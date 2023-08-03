@@ -1,18 +1,4 @@
-/**************************************************************************************
-* Copyright (c) 2020 Institute of Computing Technology, CAS
-* Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
-* NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
-* You may obtain a copy of Mulan PSL v2 at:
-*             http://license.coscl.org.cn/MulanPSL2 
-* 
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER 
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
-* FIT FOR A PARTICULAR PURPOSE.  
-*
-* See the Mulan PSL v2 for more details.  
-***************************************************************************************/
+
 
 package utils
 
@@ -39,8 +25,8 @@ object RegMap {
 object MaskedRegMap {
   def Unwritable = null
   def NoSideEffect: UInt => UInt = (x=>x)
-  def WritableMask = Fill(if (Settings.get("IsRV32") || Settings.get("IsLa32r")) 32 else 64, true.B)
-  def UnwritableMask = 0.U(if (Settings.get("IsRV32") || Settings.get("IsLa32r")) 32.W else 64.W)
+  def WritableMask = Fill(32, true.B)
+  def UnwritableMask = 0.U(32.W)
   def apply(addr: Int, reg: UInt, wmask: UInt = WritableMask, wfn: UInt => UInt = (x => x), rmask: UInt = WritableMask) = (addr, (reg, wmask, wfn, rmask))
   def generate(mapping: Map[Int, (UInt, UInt, UInt => UInt, UInt)], raddr: UInt, rdata: UInt,
     waddr: UInt, wen: Bool, wdata: UInt):Unit = {

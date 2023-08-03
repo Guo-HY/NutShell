@@ -1,30 +1,14 @@
-/**************************************************************************************
-* Copyright (c) 2020 Institute of Computing Technology, CAS
-* Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
-* NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
-* You may obtain a copy of Mulan PSL v2 at:
-*             http://license.coscl.org.cn/MulanPSL2 
-* 
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER 
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
-* FIT FOR A PARTICULAR PURPOSE.  
-*
-* See the Mulan PSL v2 for more details.  
-***************************************************************************************/
-
 package device
 
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.loadMemoryFromFile
-import nutcore.HasNutCoreParameter
+import eulacore.HasEulaCoreParameter
 import bus.axi4._
 import top.Settings
 import utils._
 
-class RAMHelper(memByte: Int) extends BlackBox with HasNutCoreParameter {
+class RAMHelper(memByte: Int) extends BlackBox with HasEulaCoreParameter {
   val io = IO(new Bundle {
     val clk = Input(Clock())
     val rIdx = Input(UInt(DataBits.W))
@@ -38,7 +22,7 @@ class RAMHelper(memByte: Int) extends BlackBox with HasNutCoreParameter {
 }
 
 class AXI4RAM[T <: AXI4Lite](_type: T = new AXI4, memByte: Int, // TODO : dose need set memByte BigInt ?
-  useBlackBox: Boolean = false) extends AXI4SlaveModule(_type) with HasNutCoreParameter {
+  useBlackBox: Boolean = false) extends AXI4SlaveModule(_type) with HasEulaCoreParameter {
 
   val offsetBits = log2Up(memByte)
   val offsetMask = (1 << offsetBits) - 1

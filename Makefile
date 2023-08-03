@@ -1,5 +1,4 @@
 TOP = TopMain
-FPGATOP = NutShellFPGATop
 BUILD_DIR = ./build
 TOP_V = $(BUILD_DIR)/$(TOP).v
 SCALA_FILE = $(shell find ./src/main/scala -name '*.scala')
@@ -11,15 +10,14 @@ SIMTOP = top.TopMain
 IMAGE ?= ready-to-run/linux.bin
 
 DATAWIDTH ?= 32
-BOARD ?= sim #loongsonfpga  # sim  pynq  axu3cg
-CORE  ?= la32r  # inorder  ooo  embedded la32r
+BOARD ?= sim #loongsonfpga  
+CORE  ?= la32r
 
 .DEFAULT_GOAL = verilog
 
 help:
 	./mill chiselModule.runMain top.$(TOP) --help BOARD=$(BOARD) CORE=$(CORE)
 
-# --infer-rw $(FPGATOP) --repl-seq-mem -c:$(FPGATOP):-o:$(@D)/$(@F).conf
 $(TOP_V): $(SCALA_FILE)
 	mkdir -p $(@D)
 	./mill chiselModule.runMain top.$(TOP) -td $(@D) --output-file $(@F) BOARD=$(BOARD) CORE=$(CORE)

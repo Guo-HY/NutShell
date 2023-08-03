@@ -1,22 +1,6 @@
-/**************************************************************************************
-* Copyright (c) 2020 Institute of Computing Technology, CAS
-* Copyright (c) 2020 University of Chinese Academy of Sciences
-* 
-* NutShell is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2. 
-* You may obtain a copy of Mulan PSL v2 at:
-*             http://license.coscl.org.cn/MulanPSL2 
-* 
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER 
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR 
-* FIT FOR A PARTICULAR PURPOSE.  
-*
-* See the Mulan PSL v2 for more details.  
-***************************************************************************************/
-
 package top
 
-import nutcore.{La32rNutCore, NutCoreConfig}
+import eulacore.{EulaCore, EulaCoreConfig}
 import sim.SimTop
 import chisel3._
 import chisel3.stage._
@@ -81,7 +65,7 @@ class Top extends RawModule {
 
   withClockAndReset(io.clock, !io.reset) {
     val memXbar = Module(new SimpleBusCrossbarNto1(2))
-    val core = Module(new La32rNutCore()(NutCoreConfig()))
+    val core = Module(new EulaCore()(EulaCoreConfig()))
 
     core.io.ipi := false.B
     core.io.hwi := io.ext_int
@@ -214,13 +198,7 @@ object TopMain extends App {
   val s = (board match {
     case "sim"    => Nil
     case "loongsonfpga" => Nil
-    case "pynq"   => PynqSettings()
-    case "axu3cg" => Axu3cgSettings()
-    case "PXIe"   => PXIeSettings()
   } ) ++ ( core match {
-    case "inorder"  => InOrderSettings()
-    case "ooo"  => OOOSettings()
-    case "embedded"=> EmbededSettings()
     case "la32r" => La32rSettings()
   } )
   s.foreach{Settings.settings += _} // add and overwrite DefaultSettings
