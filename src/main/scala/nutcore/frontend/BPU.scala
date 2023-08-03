@@ -260,7 +260,7 @@ class BPU_embedded extends NutCoreModule {
 
   val taken = reqLatch.actualTaken
   val newCnt = Mux(taken, cnt + 1.U, cnt - 1.U)
-  val phtwen = ((taken && (cnt =/= "b11".U)) || (!taken && (cnt =/= "b00".U))) && reqLatch.valid && ALUOpType.isBranch(reqLatch.fuOpType)
+  val phtwen = ((taken && (cnt =/= "b11".U)) || (!taken && (cnt =/= "b00".U))) && reqLatch.valid && La32rALUOpType.isBranch(reqLatch.fuOpType)
   pht.io.w.req.valid := phtwen
   pht.io.w.req.bits.setIdx := btbAddr.getIdx(reqLatch.pc)
   pht.io.w.req.bits.data := newCnt
@@ -274,16 +274,16 @@ class BPU_embedded extends NutCoreModule {
 //    }
 //  }
 
-  ras.io.w.req.valid := req.valid && (req.fuOpType === ALUOpType.call)
+  ras.io.w.req.valid := req.valid && (req.fuOpType === La32rALUOpType.call)
   ras.io.w.req.bits.setIdx := sp.value + 1.U
   ras.io.w.req.bits.data := req.pc + 4.U
 
   when (req.valid) {
-    when (req.fuOpType === ALUOpType.call) {
+    when (req.fuOpType === La32rALUOpType.call) {
 //      ras.write(sp.value + 1.U, req.pc + 4.U)
       sp.value := sp.value + 1.U
     }
-    .elsewhen (req.fuOpType === ALUOpType.ret) {
+    .elsewhen (req.fuOpType === La32rALUOpType.ret) {
       sp.value := sp.value - 1.U
     }
   }

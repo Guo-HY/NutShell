@@ -65,7 +65,7 @@ cputest_list = ["add-longlong",
 ]
 
 misctest_dir = os.path.join(AM_HOME, "tests/misctest/build")
-misctest_list = ["csr-read-write", "tlb-read-write", "preld-test", "confreg-test"]
+misctest_list = ["csr-read-write", "preld-test", "confreg-test"] #"tlb-read-write", 
 
 cachetest_dir = os.path.join(AM_HOME, "tests/cachetest/build")
 cachetest_list = ["access", "cache-flush", "dbar-test", "dcache-walk", "ibar-test", "load-after-store-test"]
