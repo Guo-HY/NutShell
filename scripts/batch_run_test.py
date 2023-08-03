@@ -13,7 +13,7 @@ NOOP_HOME = os.getenv("NOOP_HOME")
 NEMU_HOME = os.getenv("NEMU_HOME")
 AM_HOME = os.getenv("AM_HOME")
 ISA = "la32r"
-PLATFORM = "nutshell"
+PLATFORM = "eula"
 
 if NOOP_HOME == None or NEMU_HOME == None or AM_HOME == None:
     sys.stderr.write("Environment variables are not set correctly\n")
