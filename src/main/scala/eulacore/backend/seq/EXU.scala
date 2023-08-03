@@ -70,7 +70,7 @@ class EXU(implicit val p: EulaCoreConfig) extends EulaCoreModule {
   
   io.out.bits.decode := DontCare
   (io.out.bits.decode.ctrl, io.in.bits.ctrl) match { case (o, i) =>
-    // TODO : actually do not need loadAddrMisaligned and storeAddrMisaligned when la32r enable
+
     o.rfWen := i.rfWen && (!lsu.io.la32rExcp.hasExcp || !fuValids(FuType.lsu)) && !(csr.io.wenFix && fuValids(FuType.csr)) // TODO : csr cond may has bug
     o.rfDest := i.rfDest
     o.fuType := i.fuType
@@ -83,9 +83,6 @@ class EXU(implicit val p: EulaCoreConfig) extends EulaCoreModule {
   io.out.bits.decode.cf.redirect <>
     Mux(alu.io.redirect.valid, alu.io.redirect,
       Mux(csr.io.redirect.valid, csr.io.redirect, mou.io.redirect))
-  
-  Debug(mou.io.redirect.valid || csr.io.redirect.valid || alu.io.redirect.valid, "[REDIRECT] mou %x csr %x alu %x \n", mou.io.redirect.valid, csr.io.redirect.valid, alu.io.redirect.valid)
-  Debug(mou.io.redirect.valid || csr.io.redirect.valid || alu.io.redirect.valid, "[REDIRECT] flush: %d mou %x csr %x alu %x\n", io.flush, mou.io.redirect.target, csr.io.redirect.target, alu.io.redirect.target)
 
   // FIXME: should handle io.out.ready == false
   // TODO : may has perf bug

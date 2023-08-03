@@ -836,11 +836,4 @@ class La32rCSR(implicit override val p: EulaCoreConfig) extends AbstractCSR with
 
   io.tlbModifyInst := valid && func === La32rCSROpType.tlbwr || func === La32rCSROpType.tlbfill || func === La32rCSROpType.invtlb
 
-  // dirty implement to pass firrtl compile
-  val mtip = WireInit(false.B)
-  val meip = WireInit(false.B)
-  val msip = WireInit(false.B)
-  BoringUtils.addSink(mtip, "mtip")
-  BoringUtils.addSink(meip, "meip")
-  BoringUtils.addSink(msip, "msip")
 }

@@ -34,9 +34,4 @@ class Frontend_embedded(implicit val p: EulaCoreConfig) extends EulaCoreModule w
   io.bpFlush <> ifu.io.bpFlush
   io.imem <> ifu.io.imem
 
-    Debug("------------------------ FRONTEND:------------------------\n")
-    Debug("flush = %b, ifu:(%d,%d), idu:(%d,%d)\n",
-      ifu.io.flushVec.asUInt, ifu.io.out.valid, ifu.io.out.ready, idu.io.in(0).valid, idu.io.in(0).ready)
-    Debug(ifu.io.out.valid, "IFU: pc = 0x%x, instr = 0x%x\n", ifu.io.out.bits.pc, ifu.io.out.bits.instr)
-    Debug(idu.io.in(0).valid, "IDU1: pc = 0x%x, instr = 0x%x, pnpc = 0x%x\n", idu.io.in(0).bits.pc, idu.io.in(0).bits.instr, idu.io.in(0).bits.pnpc)
 }
