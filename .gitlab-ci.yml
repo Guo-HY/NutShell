@@ -1,5 +1,5 @@
 stages:
-  - build-emu
+  - build
   - func-tests
   - app-tests
   - perf-tests
@@ -23,7 +23,7 @@ default:
 
 
 build-emu:
-  stage: build-emu
+  stage: build
   script:
     - git clone http://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.ci-lab.net/eula/nemu.git --recursive $NEMU_PROJECT_HOME
     - make -C $NEMU_HOME la32-reduced-ref_defconfig && make -C $NEMU_HOME
@@ -33,6 +33,14 @@ build-emu:
       - ./build/emu
       - ./deps/nemu/NEMU/build/la32r-nemu-interpreter-so
 
+gen-seed:
+  stage: build
+  script:
+    - echo $RANDOM | tee ./deps/emu-seed
+  artifacts:
+    paths:
+      - ./deps/emu-seed
+
 cputest:
   stage: func-tests
   variables:
@@ -41,7 +49,7 @@ cputest:
     - make -C $AM_HOME/tests/cputest
     - >
       for case in $(find $AM_HOME/tests/cputest/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+        $NUTSHELL_HOME/build/emu -i $case --seed=$(cat ./deps/emu-seed) -b 0 -e 0 -l 0 2>&1
       done
 
 misctest:
@@ -52,7 +60,7 @@ misctest:
     - make -C $AM_HOME/tests/misctest
     - >
       for case in $(find $AM_HOME/tests/misctest/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+        $NUTSHELL_HOME/build/emu -i $case --seed=$(cat ./deps/emu-seed) -b 0 -e 0 -l 0 2>&1
       done
 
 chiplabtest:
@@ -63,7 +71,7 @@ chiplabtest:
     - make -C $AM_HOME/tests/chiplabtest
     - >
       for case in $(find $AM_HOME/tests/chiplabtest/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+        $NUTSHELL_HOME/build/emu -i $case --seed=$(cat ./deps/emu-seed) -b 0 -e 0 -l 0 2>&1
       done
 
 
@@ -78,7 +86,7 @@ apps:
     - make -C $AM_HOME/apps/$APP
     - >
       for case in $(find $AM_HOME/apps/$APP/build -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+        $NUTSHELL_HOME/build/emu -i $case --seed=$(cat ./deps/emu-seed) -b 0 -e 0 -l 0 2>&1
       done
 
 
@@ -90,5 +98,5 @@ nscsss_perf:
     - make -C $AM_HOME/apps/nscscc_perf
     - >
       for case in $(find $AM_HOME/apps/nscscc_perf/obj -name '*.bin'); do
-        $NUTSHELL_HOME/build/emu -i $case -b 0 -e 0 -l 0 2>&1
+        $NUTSHELL_HOME/build/emu -i $case --seed=$(cat ./deps/emu-seed) -b 0 -e 0 -l 0 2>&1
       done
