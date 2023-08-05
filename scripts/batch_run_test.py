@@ -2,7 +2,6 @@ import os
 import sys
 import logging
 import subprocess
-import sh
 import re
 import random
 
@@ -122,10 +121,10 @@ def run_single_test(tp_path):
     if not os.path.exists(tp_path):
         logging.debug(tp_path + " does not exists, skip")
         return
-    runcommand = emu_path + " --seed=" + str(seed) + " -i " + tp_path + " -b 0 -e 0 -l 0"
-    logging.debug("runcommand:" + runcommand)
+    runcommand = (emu_path, f"--seed={seed}", "-i", tp_path, "-b", "0", "-e", "0", "-l", "0")
+    logging.debug("runcommand:" + " ".join(runcommand))
     try:
-        out_bytes = subprocess.check_output([emu_path, "-i", tp_path], stderr=subprocess.STDOUT)
+        out_bytes = subprocess.check_output(runcommand, stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as e:
         out_bytes = e.output
         print(out_bytes.decode('utf-8'), file=runlog)
