@@ -627,10 +627,9 @@ class La32rCache(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheM
     BoringUtils.addSink(receiveSem, "sendDCacheSem")
     BoringUtils.addSource(releaseSem, "dcacheReleaseSem")
   }
-  tryGetSem := s3.io.tryGetSem || cacheInvalidUnit.io.tryGetSem
-  releaseSem := s3.io.releaseSem && cacheInvalidUnit.io.releaseSem
+  tryGetSem := s3.io.tryGetSem
+  releaseSem := s3.io.releaseSem
   s3.io.receiveSem := receiveSem
-  cacheInvalidUnit.io.receiveSem := receiveSem
 
 //  if (EnableOutOfOrderExec) {
 //    BoringUtils.addSource(s3.io.out.fire() && s3.io.in.bits.hit, "perfCntCondM" + cacheName + "Hit")
@@ -661,10 +660,6 @@ class CacheInvalidUnitIO(implicit val cacheConfig: La32rCacheConfig) extends La3
   val cachePipelineClear = Input(Bool())
   val inprocess = Output(Bool())
   val done = Output(Bool())
-
-  val tryGetSem = Output(Bool())
-  val receiveSem = Input(Bool())
-  val releaseSem = Output(Bool())
 }
 
 class AbstractCacheInvalidUnit(implicit val cacheConfig: La32rCacheConfig) extends La32rCacheModule {
@@ -726,8 +721,6 @@ class ICacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
   io.mem.req.bits.apply(addr = 0.U, cmd = 0.U, size = 0.U, wdata = 0.U, wmask = 0.U, user = 0.U, id = 0.U)
   io.mem.resp.ready := true.B
 
-  io.tryGetSem := false.B
-  io.releaseSem := true.B
 }
 
 // for all cacop inst and ibar, just invalid all cacheline and writeback all dirty data in dcache for simplicity of implementation
@@ -763,6 +756,10 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
   val isLastSet = (Sets - 1).U
   val isLastBeat = (LineBeats - 1).U
 
+  val tryGetSem = WireInit(false.B)
+  val receiveSem = WireInit(false.B)
+  val releaseSem = WireInit(false.B)
+
   switch (state) {
     is(s_idle) {
       when(io.req.valid) {
@@ -771,7 +768,8 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
     }
 
     is(s_wait_cache_clear) {
-      when(io.cachePipelineClear && !isStoreTag && io.receiveSem) {
+      // TODO : remove io.cachePipelineClear because it must be true
+      when(io.cachePipelineClear && !isStoreTag && receiveSem) {
         state := s_readMetaReq
         metaSetCnt := 0.U
       }
@@ -908,8 +906,11 @@ class DCacheInvalidUnit(implicit override val cacheConfig: La32rCacheConfig) ext
 
   io.mem.resp.ready := way_state === s_writeResp
 
-  io.tryGetSem := (state === s_wait_cache_clear) && !isStoreTag
-  io.releaseSem := state === s_idle || state === s_done
+  BoringUtils.addSource(tryGetSem, "dcacheInvUnitTryGetSem")
+  BoringUtils.addSink(receiveSem, "sendDcacheInvUnitSem")
+  BoringUtils.addSource(releaseSem, "dcacheInvUnitReleaseSem")
+  tryGetSem := (state === s_wait_cache_clear) && !isStoreTag
+  releaseSem := state === s_idle || state === s_done
 
 }
 
@@ -941,6 +942,12 @@ class La32rCache_fake(implicit val cacheConfig: La32rCacheConfig) extends La32rC
     BoringUtils.addSource(tryGetSem, "dcacheTryGetSem")
     BoringUtils.addSink(receiveSem, "sendDCacheSem")
     BoringUtils.addSource(releaseSem, "dcacheReleaseSem")
+    val dcacheInvUnitTryGetSem = WireInit(false.B)
+    val receiveDcacheInvUnitSem = WireInit(false.B)
+    val dcacheInvUnitReleaseSem = WireInit(false.B)
+    BoringUtils.addSource(dcacheInvUnitTryGetSem, "dcacheInvUnitTryGetSem")
+    BoringUtils.addSink(receiveDcacheInvUnitSem, "sendDcacheInvUnitSem")
+    BoringUtils.addSource(dcacheInvUnitReleaseSem, "dcacheInvUnitReleaseSem")
   }
 
   val ismmioRec = RegEnable(ismmio, io.in.req.fire())
