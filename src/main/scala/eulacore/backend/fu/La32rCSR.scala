@@ -828,7 +828,7 @@ class La32rCSR(implicit override val p: EulaCoreConfig) extends AbstractCSR with
     diffEstatSync.io.clock := clock
     diffEstatSync.io.coreid := 0.U
     diffEstatSync.io.estat := RegNext(ESTAT.asUInt())
-    val needSyncEstat = io.instrValid && ((func === La32rCSROpType.excption && excptionNO === INT.U) || clearTimerInterrupt)
+    val needSyncEstat = io.instrValid && ((func === La32rCSROpType.excption && excptionNO === INT.U) || clearTimerInterrupt || (valid && func === La32rCSROpType.csrrd && addr === 5.U))
     diffEstatSync.io.wmask := RegNext(RegNext(Fill(32, needSyncEstat)))
 
   }
