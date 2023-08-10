@@ -5,7 +5,7 @@ import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.BoringUtils
 import bus.axi4._
-import device.{AXI4Confreg, AXI4RAM}
+import device.{AXI4Confreg, AXI4RAM, AXI4UART8250}
 import eulacore._
 import _root_.utils.GTimer
 import bus.simplebus._
@@ -17,6 +17,7 @@ object DeviceSpace extends HasEulaCoreParameter {
   def device = List(
     (Settings.getLong("ConfregBase1"), Settings.getLong("ConfregSize")), // confreg
     (Settings.getLong("ConfregBase2"), Settings.getLong("ConfregSize")),
+    (Settings.getLong("UartBase"), Settings.getLong("UartSize")),
   )
 
   def isDevice(addr: UInt) = device.map(range => {
@@ -43,6 +44,8 @@ class SimTop extends Module  {
 
   val confreg = Module(new AXI4Confreg)
 
+  val uart8250 = Module(new AXI4UART8250) // only used for linux
+
   val addrSpace = DeviceSpace.device ++ List( // need set device before ram for memXbar select priority
     (Settings.getLong("RAMBase"), Settings.getLong("RAMSize")),
   )
@@ -54,7 +57,7 @@ class SimTop extends Module  {
   deviceXbar.io.in <> core.io.uncachedMem
 
   ramXbar.io.in(0) <> core.io.cachedMem
-  ramXbar.io.in(1) <> deviceXbar.io.out(2)
+  ramXbar.io.in(1) <> deviceXbar.io.out(3)
 
   memdelay.io.in <> ramXbar.io.out.toAXI4(isFromCache = true)
   mem.io.in <> memdelay.io.out
@@ -63,6 +66,7 @@ class SimTop extends Module  {
   confregXbar.io.in(1) <> deviceXbar.io.out(1)
   confreg.io.in <> confregXbar.io.out.toAXI4Lite()
 
+  uart8250.io.in <> deviceXbar.io.out(2).toAXI4Lite()
 
   val log_begin, log_end, log_level = WireInit(0.U(64.W))
   log_begin := io.logCtrl.log_begin
@@ -78,7 +82,14 @@ class SimTop extends Module  {
 
   BoringUtils.addSource(io.logCtrl.log_level, "DISPLAY_LOG_LEVEL")
 
-  io.uart <> confreg.io.extra.get
+  val uart8250out = uart8250.io.extra.get.out
+  val confregout = confreg.io.extra.get.out
+  io.uart.out.valid := uart8250out.valid | confregout.valid
+  io.uart.out.ch := Mux(uart8250out.valid, uart8250out.ch, confregout.ch)
+
+  io.uart.in.valid := 0.U
+  uart8250.io.extra.get.in.ch := 0.U
+  confreg.io.extra.get.in.ch := 0.U
 
   io.timer := GTimer()
 
