@@ -210,6 +210,7 @@ trait HasLa32rCSRConst {
 
 }
 
+// TODO : split fetch tlb excp and set fetch tlb excp number less than decode excp
 trait HasLa32rExceptionNO {
   // do not change this encode because it represents priority
   def INT = 0
@@ -503,7 +504,9 @@ class La32rCSR(implicit override val p: EulaCoreConfig) extends AbstractCSR with
   csrExceptionVec(PME) := io.la32rLSUExcp.tlbExcp.pageModifyExcp || hitCacopTlbExcp.pageModifyExcp
   csrExceptionVec(INE) := valid && func === La32rCSROpType.invtlb && io.cfIn.instr(4, 0) > 6.U
 
-  val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, io.instrValid)) | csrExceptionVec.asUInt
+  val hasFetchTlbExcp = io.instrValid && (io.cfIn.exceptionVec(TLBR) | io.cfIn.exceptionVec(PIF) | io.cfIn.exceptionVec(PPI))
+  // when fetch has tlb excp, should not generate decode or exec excp because tlb excp NO is less than decode or exec excp NO
+  val exceptionVec = (io.cfIn.exceptionVec.asUInt & Fill(16, io.instrValid)) | (csrExceptionVec.asUInt & Fill(16, !hasFetchTlbExcp))
   raiseException := exceptionVec.orR
   val excptionNO = PriorityEncoder(exceptionVec)
   io.wenFix := raiseException // TODO : what is this

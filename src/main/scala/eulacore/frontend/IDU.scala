@@ -127,9 +127,11 @@ class La32rDecoder(implicit override val p: EulaCoreConfig) extends AbstractDeco
   io.out.bits.cf.intrVec.zip(intrVec.asBools).map { case (x, y) => x := y }
   hasIntr := intrVec.orR
 
+  val fetchHasExcp = io.in.bits.exceptionVec(ADEF) | io.in.bits.exceptionVec(TLBR) | io.in.bits.exceptionVec(PIF) | io.in.bits.exceptionVec(PPI)
+
   io.out.bits.cf.exceptionVec := io.in.bits.exceptionVec
   io.out.bits.cf.exceptionVec(INT) := io.in.valid && hasIntr
-  io.out.bits.cf.exceptionVec(INE) := (instrType === InstrN && !hasIntr) && io.in.valid
+  io.out.bits.cf.exceptionVec(INE) := (instrType === InstrN && !hasIntr) && io.in.valid && !fetchHasExcp
 
   io.out.bits.ctrl.isEulaCoreTrap := (instr === EulaCoreTrap.TRAP) && io.in.valid
 
