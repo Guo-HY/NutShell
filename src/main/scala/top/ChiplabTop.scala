@@ -68,6 +68,7 @@ class ChiplabTop extends RawModule {
     val debug_wb_rf_wen = Output(UInt(4.W))
     val debug_wb_rf_wnum = Output(UInt(5.W))
     val debug_wb_rf_wdata = Output(UInt(32.W))
+    val debug_wb_instr = Output(UInt(32.W))
   })
 
   withClockAndReset(io.clock, !io.reset) {
@@ -129,15 +130,18 @@ class ChiplabTop extends RawModule {
     val w_debug_wb_pc = WireInit(0.U(32.W))
     val w_debug_wb_rf_wdata = WireInit(0.U(32.W))
     val w_debug_wb_rf_wnum = WireInit(0.U(5.W))
+    val w_debug_wb_instr = WireInit(0.U(32.W))
     BoringUtils.addSink(w_debug_wb_rf_wen, "DEBUG_WB_RF_WEN")
     BoringUtils.addSink(w_debug_wb_pc, "DEBUG_WB_PC")
     BoringUtils.addSink(w_debug_wb_rf_wdata, "DEBUG_WB_RF_WDATA")
     BoringUtils.addSink(w_debug_wb_rf_wnum, "DEBUG_WB_RF_WNUM")
+    BoringUtils.addSink(w_debug_wb_instr, "DEBUG_WB_INSTR")
 
     io.debug_wb_rf_wen := w_debug_wb_rf_wen
     io.debug_wb_pc := w_debug_wb_pc
     io.debug_wb_rf_wdata := w_debug_wb_rf_wdata
     io.debug_wb_rf_wnum := w_debug_wb_rf_wnum
+    io.debug_wb_instr := w_debug_wb_instr
 
     io.ws_valid := false.B
     io.rf_rdata := 0.U
@@ -198,5 +202,6 @@ class ChiplabTop extends RawModule {
   forceName(io.debug_wb_rf_wen, "debug0_wb_rf_wen")
   forceName(io.debug_wb_rf_wnum, "debug0_wb_rf_wnum")
   forceName(io.debug_wb_rf_wdata, "debug0_wb_rf_wdata")
+  forceName(io.debug_wb_instr, "debug0_wb_instr")
 
 }

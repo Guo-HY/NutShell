@@ -28,6 +28,13 @@ object La32rSettings {
   )
 }
 
+object PerfTestSettings {
+  def apply() = Map(
+    "TlbEntryNum" -> 4
+  )
+}
+
+
 object Settings {
   var settings: Map[String, AnyVal] = DefaultSettings()
   def get(field: String) = {

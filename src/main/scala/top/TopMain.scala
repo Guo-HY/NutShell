@@ -202,8 +202,9 @@ object TopMain extends App {
   
   val s = (board match {
     case "sim"    => Nil
-    case "loongsonfpga" => Nil
+    case "perftest" => PerfTestSettings()
     case "chiplab" => Nil
+    case "megasoc" => Nil
   } ) ++ ( core match {
     case "la32r" => La32rSettings()
   } )
@@ -219,7 +220,7 @@ object TopMain extends App {
     (new ChiselStage).execute(args, Seq(
       ChiselGeneratorAnnotation(() => new SimTop))
     )
-  } else if (board == "loongsonfpga") {
+  } else if (board == "perftest" || board == "megasoc") {
     (new ChiselStage).execute(args, Seq(
       ChiselGeneratorAnnotation(() => new Top))
     )
