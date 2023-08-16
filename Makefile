@@ -10,8 +10,8 @@ SIMTOP = top.TopMain
 IMAGE ?= ready-to-run/linux.bin
 
 DATAWIDTH ?= 32
-BOARD ?= sim #loongsonfpga  
-CORE  ?= la32r
+BOARD ?= sim # chiplab megasoc perftest
+CORE  ?= inorder
 
 .DEFAULT_GOAL = verilog
 

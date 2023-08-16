@@ -206,7 +206,7 @@ object TopMain extends App {
     case "chiplab" => Nil
     case "megasoc" => Nil
   } ) ++ ( core match {
-    case "la32r" => La32rSettings()
+    case "inorder" => Nil
   } )
   s.foreach{Settings.settings += _} // add and overwrite DefaultSettings
   println("====== Settings = (" + board + ", " +  core + ") ======")

@@ -4,11 +4,6 @@ object DefaultSettings {
   def apply() = Map(
     "FPGAPlatform" -> false,
     "EnableDebug" -> true,
-  )
-}
-
-object La32rSettings {
-  def apply() = Map(
     "HasDcache" -> true,
     "HasIcache" -> true,
     "IcacheSize" -> 8, // kbytes
