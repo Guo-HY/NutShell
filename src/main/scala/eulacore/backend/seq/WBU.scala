@@ -69,5 +69,6 @@ class WBU(implicit val p: EulaCoreConfig) extends EulaCoreModule{
     BoringUtils.addSource(RegNext(Fill(4, io.wb.rfWen)), "DEBUG_WB_RF_WEN")
     BoringUtils.addSource(RegNext(io.wb.rfDest), "DEBUG_WB_RF_WNUM")
     BoringUtils.addSource(RegNext(io.wb.rfData), "DEBUG_WB_RF_WDATA")
+    BoringUtils.addSource(RegNext(io.in.bits.decode.cf.instr), "DEBUG_WB_INSTR")
   }
 }
